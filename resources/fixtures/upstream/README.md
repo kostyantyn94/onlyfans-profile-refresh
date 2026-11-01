@@ -1,6 +1,6 @@
 # Upstream response fixtures
 
-Used by the tests (`tests/`) and by the local fake upstream (`fake-upstream/server.php`).
+Used by the tests (`tests/`). The local fake upstream (`fake-upstream/server.php`) builds its answers in the same three shapes (old, new, Fans API) from its scenario instead of reading these files.
 
 | File | What it is | Status |
 |---|---|---|

@@ -6,7 +6,7 @@ return [
     // only so the failure can be reproduced (REFRESH_HANDLER=legacy).
     'handler' => env('REFRESH_HANDLER', 'v2'),
 
-    'queue' => 'refresh',
+    'queue' => env('REFRESH_QUEUE', 'refresh'),
 
     // Profiles above this many likes refresh every 24 hours, the rest (including
     // exactly 100,000) every 72 hours.

@@ -1,16 +1,15 @@
-# php artisan test --group=incident, with the fix (REFRESH_HANDLER=v2, the default)
-# 2026-11-01T19:24:24Z
+# php artisan test --group=incident (fixed handler)
 
 
    PASS  Tests\Feature\IncidentRegressionTest
-  ✓ old format is still accepted                                         0.50s  
-  ✓ new format with likes inside profile is stored                       0.14s  
-  ✓ rate limit without retry after keeps data and is retried later       0.14s  
-  ✓ server error with empty body keeps data and is retried later         0.12s  
-  ✓ missing likes is invalid not zero                                    0.18s  
-  ✓ an older revision arriving last does not overwrite newer data        0.13s  
-  ✓ the same job delivered twice neither duplicates nor corrupts         0.25s  
+  ✓ old format is still accepted                                         0.51s  
+  ✓ new format with likes inside profile is stored                       0.11s  
+  ✓ rate limit without retry after keeps data and is retried later       0.16s  
+  ✓ server error with empty body keeps data and is retried later         0.13s  
+  ✓ missing likes is invalid not zero                                    0.15s  
+  ✓ an older revision arriving last does not overwrite newer data        0.14s  
+  ✓ the same job delivered twice neither duplicates nor corrupts         0.21s  
 
-  Tests:    7 passed (29 assertions)
-  Duration: 1.56s
+  Tests:    7 passed (30 assertions)
+  Duration: 1.51s
 

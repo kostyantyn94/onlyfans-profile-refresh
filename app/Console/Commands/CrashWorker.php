@@ -77,8 +77,13 @@ class CrashWorker extends Command
             Redis::zcard('queues:refresh:reserved')));
 
         $this->line("Waiting for Redis to hand the job out again (retry_after = {$retryAfter} s)...");
-        $expected = $point === 'after-write' ? 2 : 1;
-        $redelivered = $this->waitFor(fn () => RefreshAttempt::query()->where('refresh_id', $refreshId)->count() >= $expected, (int) $this->option('wait'));
+        // After the write, the redelivered job finds its refresh finished and skips
+        // (a log line, no upstream call); before the write, it does the work.
+        $log = storage_path('logs/refresh.log');
+        $offset = is_file($log) ? filesize($log) : 0;
+        $redelivered = $this->waitFor(fn () => $point === 'after-write'
+            ? str_contains((string) file_get_contents($log, offset: $offset), '"refresh.skipped_not_pending","context":{"refresh_id":"'.$refreshId)
+            : RefreshAttempt::query()->where('refresh_id', $refreshId)->count() >= 1, (int) $this->option('wait'));
 
         $final = $profile->fresh();
         $attempts = RefreshAttempt::query()->where('refresh_id', $refreshId)->orderBy('id')->get();
@@ -87,7 +92,8 @@ class CrashWorker extends Command
             ['redelivered', $redelivered ? sprintf('yes, %.0f s after queueing', microtime(true) - $queuedAt) : 'NO (timed out)'],
             ['profile rows for crash-001', Profile::query()->where('account_id', $account->id)->where('username', 'crash-001')->count()],
             ['final likes / revision', "{$final->likes_count} / {$final->revision}"],
-            ['attempts (outcome, job attempt)', $attempts->map(fn ($a) => "{$a->outcome} (#{$a->job_attempt})")->implode(', ')],
+            ['attempts recorded (outcome, job attempt)', $attempts->map(fn ($a) => "{$a->outcome} (#{$a->job_attempt})")->implode(', ') ?: 'none'],
+            ['second delivery', $point === 'after-write' ? 'skipped: refresh already finished, no upstream call' : 'did the refresh'],
             ['upstream requests', array_sum(array_map('intval', $fake->hgetall('fake-upstream:status:crash') ?: []))],
             ['claim', $final->pending_refresh_id ? 'still held' : 'released'],
             ['last_attempt_status', $final->last_attempt_status],
