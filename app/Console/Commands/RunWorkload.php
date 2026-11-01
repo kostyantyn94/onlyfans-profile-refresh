@@ -182,7 +182,9 @@ class RunWorkload extends Command
                 'last_attempt_at' => $now->copy()->subHours(25),
                 'last_attempt_status' => 'success',
                 'last_success_at' => $now->copy()->subHours(25),
-                'next_refresh_at' => $now->copy()->subHour(),
+                // Not due: the workload queues them itself, so the scheduler
+                // container cannot pick some up first (with its own handler).
+                'next_refresh_at' => $now->copy()->addDay(),
                 'created_at' => $now,
                 'updated_at' => $now,
             ];

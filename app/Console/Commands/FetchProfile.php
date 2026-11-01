@@ -33,7 +33,10 @@ class FetchProfile extends Command
             'username' => Profile::normalizeUsername($this->argument('username')),
         ]);
 
+        $queueConnection = config('queue.default');
+
         if (! $this->option('queue')) {
+            // Run the first attempt right here, through the same middleware.
             config(['queue.default' => 'sync']);
         }
 
@@ -52,6 +55,14 @@ class FetchProfile extends Command
         }
 
         $profile->refresh();
+
+        if ($profile->pending_refresh_id === $refreshId) {
+            // Rate limited, failed temporarily or deferred by the account gate:
+            // the sync driver cannot wait, so hand the retry to Horizon.
+            $delay = $profile->attempts()->where('refresh_id', $refreshId)->latest('id')->value('retry_in_seconds') ?? 5;
+            dispatch($scheduler->makeJob($profile->id, $profile->account_id, $refreshId)->onConnection($queueConnection)->delay($delay));
+            $this->warn("Not finished yet; Horizon retries refresh {$refreshId} in {$delay} s.");
+        }
         $attempt = $profile->attempts()->latest('id')->first();
 
         $this->table(['Field', 'Value'], [

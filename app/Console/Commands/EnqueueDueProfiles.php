@@ -13,9 +13,11 @@ class EnqueueDueProfiles extends Command
 
     public function handle(RefreshScheduler $scheduler): int
     {
+        $started = microtime(true);
         $queued = $scheduler->enqueueDue(max: (int) $this->option('max'));
 
-        $this->info("Queued {$queued} refresh(es).");
+        $this->info(sprintf('Queued %d refresh(es) in %.2f s, peak memory %.1f MB.',
+            $queued, microtime(true) - $started, memory_get_peak_usage(true) / 1048576));
 
         return self::SUCCESS;
     }
