@@ -39,6 +39,22 @@ services:
     <<: *php
     command: php artisan schedule:work
 
+  # Stand-in for the Fans API profile endpoint, driven by the workload (fake-upstream/server.php).
+  fake-upstream:
+    image: serversideup/php:8.4-cli-alpine-v5.0.5
+    working_dir: /srv
+    command: php -S 0.0.0.0:8080 server.php
+    environment:
+      SHOW_WELCOME_MESSAGE: "false"
+      PHP_CLI_SERVER_WORKERS: 16
+      REDIS_HOST: redis
+    volumes:
+      - ./fake-upstream:/srv:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
   postgres:
     image: postgres:17-alpine
     environment:

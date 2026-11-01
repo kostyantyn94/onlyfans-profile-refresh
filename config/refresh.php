@@ -51,6 +51,9 @@ return [
     // dispatch never reached Redis. Must be longer than retry_window_minutes.
     'claim_expires_after_minutes' => 30,
 
+    // Base URL of the local fake upstream used by workload:run.
+    'fake_upstream_url' => env('FAKE_UPSTREAM_URL', 'http://fake-upstream:8080'),
+
     // Legacy handler only: blocking in-process retries, as in the incident.
     'legacy' => [
         'tries' => 3,
