@@ -3,6 +3,8 @@
 # (docker compose up -d). Takes about six minutes: the two crash tests each
 # wait for retry_after (90 s).
 set -e
+# Git Bash on Windows would rewrite container paths like /app/vendor; harmless elsewhere.
+export MSYS_NO_PATHCONV=1
 cd "$(dirname "$0")/../.."
 run() { docker compose exec -T app php artisan "$@" --no-ansi; }
 

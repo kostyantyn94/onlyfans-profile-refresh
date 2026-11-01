@@ -1,6 +1,8 @@
 #!/bin/sh
 # One-time setup. Needs Docker with Compose v2. See README, "Run it".
 set -e
+# Git Bash on Windows would rewrite container paths like /app/vendor; harmless elsewhere.
+export MSYS_NO_PATHCONV=1
 cd "$(dirname "$0")"
 
 [ -f .env ] || cp .env.example .env
