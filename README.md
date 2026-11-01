@@ -379,7 +379,7 @@ Claude Code working as an agent; see [AI.md](AI.md).
 | First independent review and its fixes, evidence, packaging | 0:30 |
 | *Second session:* second independent review and its fixes, live stale-cache check, UI redesign (a parallel agent), merge, final evidence, clean-setup check, packaging | 0:54 |
 | **Total for the task** (20:20–22:20 and 22:28–23:22) | **2:54** |
-| *Afterwards:* read-only public demo mode, hosting it through Tailscale Funnel | 0:20 |
+| *Afterwards (00:00–00:30):* read-only public demo mode, hosting it through Tailscale Funnel | 0:30 |
 
 ## Layout
 
