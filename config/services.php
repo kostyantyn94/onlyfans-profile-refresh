@@ -35,4 +35,11 @@ return [
         ],
     ],
 
+    'fansapi' => [
+        'base_url' => env('FANSAPI_BASE_URL', 'https://app.onlyfansapi.com'),
+        'key' => env('FANSAPI_KEY'),
+        // ?fresh=true costs 1 credit per request; cached answers are free.
+        'fresh' => (bool) env('FANSAPI_FRESH', false),
+    ],
+
 ];

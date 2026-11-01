@@ -52,6 +52,14 @@ return [
 
     'channels' => [
 
+        // One JSON line per refresh event; grep a refresh_id to follow one refresh.
+        'refresh' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/refresh.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'formatter' => Monolog\Formatter\JsonFormatter::class,
+        ],
+
         'stack' => [
             'driver' => 'stack',
             'channels' => explode(',', (string) env('LOG_STACK', 'single')),

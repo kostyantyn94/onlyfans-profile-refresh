@@ -1,0 +1,72 @@
+name: fansapi-profiles
+
+x-php: &php
+  # Prebuilt PHP 8.4 CLI image with pcntl, posix, redis, pdo_pgsql and composer.
+  image: serversideup/php:8.4-cli-alpine-v5.0.5
+  working_dir: /app
+  environment: &php-env
+    SHOW_WELCOME_MESSAGE: "false"
+  volumes:
+    - .:/app
+    # vendor/ lives in a Linux volume: on Docker Desktop for Windows a bind-mounted
+    # vendor/ makes every PHP boot take ~6 s. Filled by `composer install` in the container.
+    - vendor:/app/vendor
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  restart: unless-stopped
+
+services:
+  # Web UI, Horizon dashboard and the local fake upstream (/fake-upstream/...).
+  app:
+    <<: *php
+    command: php artisan serve --host=0.0.0.0 --port=8000
+    environment:
+      <<: *php-env
+      PHP_CLI_SERVER_WORKERS: 8
+    ports:
+      - "8000:8000"
+
+  horizon:
+    <<: *php
+    command: php artisan horizon
+    # Horizon finishes the current jobs on SIGTERM; give it longer than the job timeout.
+    stop_grace_period: 60s
+
+  scheduler:
+    <<: *php
+    command: php artisan schedule:work
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: profiles
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d profiles"]
+      interval: 2s
+      retries: 30
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.4-alpine
+    # AOF so queued jobs survive a Redis restart (see README, "Worker crash").
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      retries: 30
+    restart: unless-stopped
+
+volumes:
+  vendor:
+  pgdata:
+  redisdata:
