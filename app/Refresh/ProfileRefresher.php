@@ -38,6 +38,15 @@ class ProfileRefresher
             return;
         }
 
+        if ($profile->pending_refresh_id !== $job->refreshId) {
+            // This refresh no longer holds the claim: an earlier delivery of the
+            // same job already finished it (e.g. redelivered after its worker
+            // died), or the claim expired and a newer refresh took over.
+            Log::channel('refresh')->info('refresh.skipped_not_pending', $this->context($job, $profile));
+
+            return;
+        }
+
         $attempt = RefreshAttempt::query()->where('refresh_id', $job->refreshId)->count() + 1;
         $context = $this->context($job, $profile, $attempt);
 
@@ -102,8 +111,25 @@ class ProfileRefresher
     private function failed(RefreshProfile $job, Profile $profile, int $attempt, Outcome $outcome, string $reason, ?UpstreamResponse $response, array $context): void
     {
         $now = CarbonImmutable::now();
-        $delay = $outcome->isRetryable() ? $this->retryDelay($job, $profile, $attempt, $outcome, $response, $now) : null;
-        $final = $delay === null;
+        $sameKind = RefreshAttempt::query()
+            ->where('refresh_id', $job->refreshId)
+            ->where('outcome', $outcome->value)
+            ->count() + 1;
+        $delay = $this->backoffSeconds($outcome, $sameKind, $response, $now);
+
+        if ($outcome === Outcome::RateLimited) {
+            // The limit belongs to the account, not to this profile: pause the
+            // whole account, even when this refresh is out of retries.
+            $this->throttle->coolDown($profile->account_id, $delay);
+        }
+
+        $final = ! $outcome->isRetryable()
+            || $sameKind >= config('refresh.retry.'.$outcome->value.'.max')
+            || $attempt >= (int) config('refresh.max_upstream_attempts');
+
+        if ($final) {
+            $delay = null;
+        }
 
         $this->store->recordFailure($profile, $outcome, $reason, $job->refreshId, $final, $now);
         $this->recordAttempt($job, $profile, $attempt, $outcome, $response, retryIn: $delay, error: $reason);
@@ -123,29 +149,15 @@ class ProfileRefresher
         }
     }
 
-    /** Seconds until the next try, or null when this kind of failure is out of retries. */
-    private function retryDelay(RefreshProfile $job, Profile $profile, int $attempt, Outcome $outcome, ?UpstreamResponse $response, CarbonImmutable $now): ?int
+    /** Delay before the next try of this kind of failure: Retry-After if sent, else randomised exponential. */
+    private function backoffSeconds(Outcome $outcome, int $sameKind, ?UpstreamResponse $response, CarbonImmutable $now): int
     {
-        $budget = config('refresh.retry.'.$outcome->value);
-        $sameKind = RefreshAttempt::query()
-            ->where('refresh_id', $job->refreshId)
-            ->where('outcome', $outcome->value)
-            ->count() + 1;
-
-        if ($sameKind >= $budget['max'] || $attempt >= (int) config('refresh.max_upstream_attempts')) {
-            return null;
-        }
-
+        $budget = config('refresh.retry.'.$outcome->value) ?? config('refresh.retry.server_error');
         $delay = Backoff::seconds($sameKind, (float) $budget['base_seconds'], (float) $budget['cap_seconds']);
 
-        if ($outcome === Outcome::RateLimited) {
-            // The limit belongs to the account, not to this profile: pause the
-            // whole account so its other jobs stop hitting the limit too.
-            $delay = Backoff::retryAfter($response?->retryAfter, $now, 300) ?? $delay;
-            $this->throttle->coolDown($profile->account_id, $delay);
-        }
-
-        return $delay;
+        return $outcome === Outcome::RateLimited
+            ? Backoff::retryAfter($response?->retryAfter, $now, 300) ?? $delay
+            : $delay;
     }
 
     private function recordAttempt(RefreshProfile $job, Profile $profile, int $attempt, Outcome $outcome, ?UpstreamResponse $response, ?int $revision = null, ?int $likes = null, ?int $retryIn = null, ?string $error = null): void

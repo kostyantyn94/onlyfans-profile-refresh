@@ -244,13 +244,68 @@ class RefreshJobTest extends TestCase
         // (its worker died before acknowledging it).
         $new = (string) Str::uuid();
         Profile::query()->whereKey($profile->id)->update(['refresh_queued_at' => now(), 'pending_refresh_id' => $new]);
-        $job = app(\App\Refresh\RefreshScheduler::class)->makeJob($profile->id, $profile->account_id, $old)->withFakeQueueInteractions();
-        app()->call([$job, 'handle']);
+        $this->deliverAgain($profile, $old);
 
         $profile->refresh();
         $this->assertSame($new, $profile->pending_refresh_id, 'the newer refresh still owns the claim');
         $this->assertSame(121_000, $profile->likes_count);
-        $this->assertSame('unchanged', RefreshAttempt::query()->latest('id')->first()->outcome);
+        $this->assertSame(1, RefreshAttempt::query()->count(), 'the old job is skipped');
+        Http::assertSentCount(1);
+    }
+
+    public function test_a_job_whose_claim_was_taken_over_does_not_call_the_upstream(): void
+    {
+        $profile = $this->profileWithValidData(attributes: ['refresh_queued_at' => now(), 'pending_refresh_id' => (string) Str::uuid()]);
+        Http::fake();
+
+        $this->deliverAgain($profile, (string) Str::uuid());
+
+        Http::assertNothingSent();
+        $this->assertSame(0, RefreshAttempt::query()->count());
+        $this->assertSame(120_000, $profile->refresh()->likes_count);
+    }
+
+    public function test_the_last_429_of_a_refresh_still_pauses_the_account(): void
+    {
+        $profile = $this->profileWithValidData();
+        $refreshId = (string) Str::uuid();
+        $this->previousAttempts($profile, $refreshId, 'rate_limited', config('refresh.retry.rate_limited.max') - 1);
+        Http::fake(['*' => Http::response('', 429)]);
+
+        $job = $this->runRefresh($profile, $refreshId);
+
+        $this->assertFalse($job->job->isReleased());
+        $this->assertGreaterThan(0, app(AccountThrottle::class)->cooldownRemainingMs($profile->account_id));
+    }
+
+    public function test_repeated_final_failures_back_off_instead_of_retrying_hourly(): void
+    {
+        $profile = $this->profileWithValidData(attributes: ['consecutive_failures' => 3]);
+        Http::fake(['*' => Http::response(['error' => 'Not Found'], 404)]);
+
+        $this->runRefresh($profile);
+
+        // 4th failure in a row: 60 min × 2^3 = 8 hours.
+        $this->assertEqualsWithDelta(now()->addHours(8)->timestamp, $profile->refresh()->next_refresh_at->timestamp, 5);
+
+        $profile->forceFill(['consecutive_failures' => 20])->save();
+        $this->runRefresh($profile);
+        $this->assertEqualsWithDelta(now()->addHours(72)->timestamp, $profile->refresh()->next_refresh_at->timestamp, 5, 'capped at the 72 h interval');
+    }
+
+    public function test_a_stale_response_does_not_bring_the_next_refresh_forward_or_loop(): void
+    {
+        // Due now, but the upstream answers with an older revision than stored.
+        $due = $this->profileWithValidData(attributes: ['revision' => 11, 'likes_count' => 121_000, 'next_refresh_at' => now()->subMinute()]);
+        // Not due for a day; a late stale answer must not make it due sooner.
+        $later = $this->profileWithValidData(attributes: ['revision' => 11, 'likes_count' => 121_000, 'next_refresh_at' => now()->addDay()]);
+        Http::fake(['*' => Http::response($this->fixture('old-format.json'))]);
+
+        $this->runRefresh($due);
+        $this->runRefresh($later);
+
+        $this->assertEqualsWithDelta(now()->addMinutes(60)->timestamp, $due->refresh()->next_refresh_at->timestamp, 5);
+        $this->assertEqualsWithDelta(now()->addDay()->timestamp, $later->refresh()->next_refresh_at->timestamp, 5);
     }
 
     public function test_giving_up_releases_the_claim_and_keeps_data(): void

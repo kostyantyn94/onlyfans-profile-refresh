@@ -7,7 +7,7 @@ use Illuminate\Console\Command;
 
 class EnqueueDueProfiles extends Command
 {
-    protected $signature = 'profiles:enqueue-due {--max=10000 : Most profiles to queue in one run}';
+    protected $signature = 'profiles:enqueue-due {--max=50000 : Most profiles to queue in one run}';
 
     protected $description = 'Queue a refresh for every profile that is due and not already pending';
 

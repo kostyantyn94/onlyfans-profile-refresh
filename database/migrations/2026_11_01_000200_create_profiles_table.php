@@ -46,7 +46,8 @@ return new class extends Migration
             $table->timestamp('next_refresh_at')->nullable();
 
             // Claim: set while a refresh is queued or running, so it is not queued twice.
-            $table->timestamp('refresh_queued_at')->nullable();
+            // Milliseconds, so "how long has this refresh waited" is not rounded.
+            $table->timestamp('refresh_queued_at', 3)->nullable();
             $table->uuid('pending_refresh_id')->nullable();
 
             $table->timestamps();
@@ -55,8 +56,8 @@ return new class extends Migration
             $table->unique(['account_id', 'username']);
         });
 
-        // The scheduler only looks at unclaimed profiles; keep that scan cheap.
-        DB::statement('CREATE INDEX profiles_due_idx ON profiles (next_refresh_at) WHERE refresh_queued_at IS NULL');
+        // The scheduler's two scans (RefreshScheduler::enqueueDue), each in index order.
+        DB::statement('CREATE INDEX profiles_due_idx ON profiles (next_refresh_at NULLS FIRST, id) WHERE refresh_queued_at IS NULL');
         DB::statement('CREATE INDEX profiles_claimed_idx ON profiles (refresh_queued_at) WHERE refresh_queued_at IS NOT NULL');
     }
 

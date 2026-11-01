@@ -204,4 +204,18 @@ class ProfilePayloadParserTest extends TestCase
         $this->assertArrayHasKey('last_seen_at', $snapshot->attributes, 'an explicit null is passed on');
         $this->assertNull($snapshot->attributes['last_seen_at']);
     }
+
+    public function test_optional_fields_that_would_not_fit_their_columns_are_skipped(): void
+    {
+        $snapshot = $this->parse(json_encode(['profile' => [
+            'likes' => 10,
+            'postsCount' => 3_000_000_000,
+            'name' => str_repeat('n', 256),
+            'subscribePrice' => -1,
+            'avatar' => 'https://example.com/'.str_repeat('a', 2100),
+        ], 'revision' => 3]));
+
+        $this->assertSame(10, $snapshot->likes);
+        $this->assertSame([], $snapshot->attributes, 'too large for an int column, too long or negative: all skipped');
+    }
 }

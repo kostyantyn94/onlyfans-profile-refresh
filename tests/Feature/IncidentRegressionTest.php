@@ -121,12 +121,13 @@ class IncidentRegressionTest extends TestCase
         $this->runRefresh($profile, $refreshId);
         // A second delivery of the same job, e.g. Redis handing it out again
         // after retry_after because the first worker never acknowledged it.
-        $this->runRefresh($profile, $refreshId);
+        $this->deliverAgain($profile, $refreshId);
 
-        $this->assertSame(1, Profile::query()->where('username', $profile->username)->count());
+        $this->assertSame(1, Profile::query()->count());
         $profile->refresh();
         $this->assertSame(121_000, $profile->likes_count);
         $this->assertSame(11, $profile->revision);
-        $this->assertSame(2, RefreshAttempt::query()->where('refresh_id', $refreshId)->count(), 'both deliveries are on record');
+        $this->assertSame(1, RefreshAttempt::query()->where('refresh_id', $refreshId)->count(), 'the second delivery finds the refresh done');
+        Http::assertSentCount(1);
     }
 }

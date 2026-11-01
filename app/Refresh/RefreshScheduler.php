@@ -47,38 +47,48 @@ class RefreshScheduler
     /**
      * Claim and queue every due profile, in batches so memory stays flat however
      * many profiles exist. FOR UPDATE SKIP LOCKED lets two schedulers run at
-     * once without claiming the same rows.
+     * once without claiming the same rows. Lost claims are taken over first, in
+     * a query of their own, so each query can walk its own partial index.
      */
-    public function enqueueDue(?CarbonImmutable $now = null, int $batch = 500, int $max = 10_000): int
+    public function enqueueDue(?CarbonImmutable $now = null, int $batch = 500, int $max = 50_000): int
     {
         $now ??= CarbonImmutable::now();
         $queued = 0;
 
-        while ($queued < $max) {
-            $limit = min($batch, $max - $queued);
+        $lostClaims = <<<'SQL'
+            SELECT id FROM profiles
+            WHERE refresh_queued_at < ?
+            ORDER BY refresh_queued_at
+            LIMIT ? FOR UPDATE SKIP LOCKED
+            SQL;
 
-            $rows = DB::select(<<<'SQL'
-                UPDATE profiles
-                SET refresh_queued_at = ?, pending_refresh_id = gen_random_uuid()
-                WHERE id IN (
-                    SELECT id FROM profiles
-                    WHERE (refresh_queued_at IS NULL AND (next_refresh_at IS NULL OR next_refresh_at <= ?))
-                       OR refresh_queued_at < ?
-                    ORDER BY next_refresh_at NULLS FIRST, id
-                    LIMIT ?
-                    FOR UPDATE SKIP LOCKED
-                )
-                RETURNING id, account_id, pending_refresh_id
-                SQL, [$now, $now, $this->claimExpiry($now), $limit]);
+        $due = <<<'SQL'
+            SELECT id FROM profiles
+            WHERE refresh_queued_at IS NULL AND (next_refresh_at IS NULL OR next_refresh_at <= ?)
+            ORDER BY next_refresh_at NULLS FIRST, id
+            LIMIT ? FOR UPDATE SKIP LOCKED
+            SQL;
 
-            foreach ($rows as $row) {
-                $this->dispatch($row->id, $row->account_id, $row->pending_refresh_id, 'schedule');
-            }
+        foreach ([[$lostClaims, $this->claimExpiry($now)], [$due, $now]] as [$select, $before]) {
+            while ($queued < $max) {
+                $limit = min($batch, $max - $queued);
 
-            $queued += count($rows);
+                $rows = DB::select(
+                    "UPDATE profiles SET refresh_queued_at = ?, pending_refresh_id = gen_random_uuid()
+                     WHERE id IN ({$select})
+                     RETURNING id, account_id, pending_refresh_id",
+                    [$now, $before, $limit],
+                );
 
-            if (count($rows) < $limit) {
-                break;
+                foreach ($rows as $row) {
+                    $this->dispatch($row->id, $row->account_id, $row->pending_refresh_id, 'schedule');
+                }
+
+                $queued += count($rows);
+
+                if (count($rows) < $limit) {
+                    break;
+                }
             }
         }
 

@@ -97,6 +97,17 @@ abstract class TestCase extends BaseTestCase
         return $job;
     }
 
+    /** Run the job for a refresh again without re-claiming: a redelivery. */
+    protected function deliverAgain(Profile $profile, string $refreshId): ShouldQueue
+    {
+        $job = app(RefreshScheduler::class)->makeJob($profile->id, $profile->account_id, $refreshId);
+        $job->withFakeQueueInteractions();
+
+        app()->call([$job, 'handle']);
+
+        return $job;
+    }
+
     protected function refreshLogLines(): array
     {
         if (! is_file($this->refreshLog)) {

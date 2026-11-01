@@ -40,11 +40,15 @@ class ProfileStore
                 $outcome = Outcome::Unchanged;
                 Profile::query()->whereKey($profile->id)->update($this->successColumns($outcome, $snapshot->likes, $now));
             } else {
-                // An older version arrived after a newer one was accepted.
+                // An older version arrived after a newer one was accepted. Push
+                // the next refresh out a little (never earlier than planned), or
+                // an upstream stuck on an old revision would be asked every minute.
                 $outcome = Outcome::Stale;
+                $retry = $now->addMinutes((int) config('refresh.failed_retry_after_minutes'))->toDateTimeString();
                 Profile::query()->whereKey($profile->id)->update([
                     'last_attempt_at' => $now,
                     'last_attempt_status' => $outcome->value,
+                    'next_refresh_at' => DB::raw("GREATEST(COALESCE(next_refresh_at, '{$retry}'), '{$retry}')"),
                     'updated_at' => $now,
                 ]);
             }
@@ -72,13 +76,15 @@ class ProfileStore
             ]);
 
             if ($final) {
+                $failures = (int) Profile::query()->whereKey($profile->id)->value('consecutive_failures');
+
                 Profile::query()
                     ->whereKey($profile->id)
                     ->where('pending_refresh_id', $refreshId)
                     ->update([
                         'refresh_queued_at' => null,
                         'pending_refresh_id' => null,
-                        'next_refresh_at' => $now->addMinutes((int) config('refresh.failed_retry_after_minutes')),
+                        'next_refresh_at' => $now->addMinutes($this->failureBackoffMinutes($failures)),
                     ]);
             }
         });
@@ -91,6 +97,14 @@ class ProfileStore
             ->whereKey($profileId)
             ->where('pending_refresh_id', $refreshId)
             ->update(['refresh_queued_at' => null, 'pending_refresh_id' => null]);
+    }
+
+    /** 60 min after the first failed refresh, doubling per consecutive failure, at most 72 h. */
+    private function failureBackoffMinutes(int $consecutiveFailures): int
+    {
+        $base = (int) config('refresh.failed_retry_after_minutes');
+
+        return (int) min($base * 2 ** max(0, $consecutiveFailures - 1), (int) config('refresh.interval_hours.default') * 60);
     }
 
     private function successColumns(Outcome $outcome, int $likes, CarbonImmutable $now): array

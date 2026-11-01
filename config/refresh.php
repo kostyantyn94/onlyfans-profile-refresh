@@ -27,9 +27,6 @@ return [
     // redis retry_after (see config/horizon.php).
     'job_timeout' => 30,
 
-    // A refresh gives up after this window even if its budgets are not spent.
-    'retry_window_minutes' => (int) env('REFRESH_RETRY_WINDOW_MINUTES', 15),
-
     // Upstream attempts allowed per refresh, per kind of failure. Delays grow
     // exponentially from base_seconds up to cap_seconds, randomised ("equal
     // jitter") so retries from many jobs do not arrive together.
@@ -44,11 +41,14 @@ return [
     // time, so one busy or rate-limited account cannot take every worker.
     'account_concurrency' => (int) env('REFRESH_ACCOUNT_CONCURRENCY', 2),
 
-    // After a refresh fails for good, try the profile again this much later.
+    // After a refresh fails for good, try the profile again this much later,
+    // doubling with each consecutive failure up to the 72-hour interval, so a
+    // deleted profile or a revoked key is not hammered every hour.
     'failed_retry_after_minutes' => 60,
 
     // A claim (refresh_queued_at) older than this is treated as lost, e.g. the
-    // dispatch never reached Redis. Must be longer than retry_window_minutes.
+    // dispatch never reached Redis. Longer than a refresh's retries can take
+    // (at most 10 attempts, each delay capped at 60 s).
     'claim_expires_after_minutes' => 30,
 
     // Base URL of the local fake upstream used by workload:run.

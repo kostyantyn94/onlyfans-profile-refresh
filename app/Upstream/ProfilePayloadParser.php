@@ -23,16 +23,16 @@ class ProfilePayloadParser
     private const ATTRIBUTES = [
         'upstream_id' => ['id', 'count'],
         'name' => ['name', 'string'],
-        'about' => ['about', 'string'],
+        'about' => ['about', 'text'],
         'avatar_url' => ['avatar', 'url'],
         'header_url' => ['header', 'url'],
         'is_verified' => ['isVerified', 'bool'],
         'subscribe_price' => ['subscribePrice', 'money'],
-        'posts_count' => ['postsCount', 'count'],
-        'photos_count' => ['photosCount', 'count'],
-        'videos_count' => ['videosCount', 'count'],
-        'audios_count' => ['audiosCount', 'count'],
-        'medias_count' => ['mediasCount', 'count'],
+        'posts_count' => ['postsCount', 'count32'],
+        'photos_count' => ['photosCount', 'count32'],
+        'videos_count' => ['videosCount', 'count32'],
+        'audios_count' => ['audiosCount', 'count32'],
+        'medias_count' => ['mediasCount', 'count32'],
         'subscribers_count' => ['subscribersCount', 'count'],
         'joined_at' => ['joinDate', 'date'],
         'last_seen_at' => ['lastSeen', 'date'],
@@ -156,8 +156,9 @@ class ProfilePayloadParser
     }
 
     /**
-     * Optional fields never fail the response: a field with an unexpected type
-     * is skipped (the stored value stays), a missing field is left untouched.
+     * Optional fields never fail the response: a field with an unexpected type,
+     * or one that would not fit its column, is skipped (the stored value stays);
+     * a missing field is left untouched.
      *
      * @return array<string, mixed>
      */
@@ -192,11 +193,13 @@ class ProfilePayloadParser
     {
         try {
             return match ($type) {
-                'string' => is_string($value) ? $value : null,
-                'url' => is_string($value) && filter_var($value, FILTER_VALIDATE_URL) ? $value : null,
+                'string' => is_string($value) && mb_strlen($value) <= 255 ? $value : null,
+                'text' => is_string($value) && strlen($value) <= 65_535 ? $value : null,
+                'url' => is_string($value) && strlen($value) <= 2048 && filter_var($value, FILTER_VALIDATE_URL) ? $value : null,
                 'bool' => is_bool($value) ? $value : null,
-                'money' => is_int($value) || is_float($value) ? round((float) $value, 2) : null,
+                'money' => (is_int($value) || is_float($value)) && $value >= 0 && $value < 100_000_000 ? round((float) $value, 2) : null,
                 'count' => $this->wholeNumber($value, 'field'),
+                'count32' => ($n = $this->wholeNumber($value, 'field')) <= 2_147_483_647 ? $n : null,
                 'date' => is_string($value) ? CarbonImmutable::parse($value)->utc() : null,
             };
         } catch (Throwable) {
