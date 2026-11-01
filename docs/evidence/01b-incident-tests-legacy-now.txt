@@ -2,13 +2,13 @@
 
 
    FAIL  Tests\Feature\IncidentRegressionTest
-  ✓ old format is still accepted                                         0.45s  
-  ⨯ new format with likes inside profile is stored                       0.11s  
-  ⨯ rate limit without retry after keeps data and is retried later       0.13s  
+  ✓ old format is still accepted                                         0.49s  
+  ⨯ new format with likes inside profile is stored                       0.14s  
+  ⨯ rate limit without retry after keeps data and is retried later       0.17s  
   ⨯ server error with empty body keeps data and is retried later         0.14s  
-  ⨯ missing likes is invalid not zero                                    0.14s  
-  ⨯ an older revision arriving last does not overwrite newer data        0.14s  
-  ⨯ the same job delivered twice neither duplicates nor corrupts         0.17s  
+  ⨯ missing likes is invalid not zero                                    0.15s  
+  ⨯ an older revision arriving last does not overwrite newer data        0.16s  
+  ⨯ the same job delivered twice neither duplicates nor corrupts         0.14s  
   ────────────────────────────────────────────────────────────────────────────  
    FAILED  Tests\Feature\IncidentRegressionTest > new format with likes insi…   
   likes moved into "profile" and must still be read
@@ -103,21 +103,21 @@ Failed asserting that 119000 is identical to 121000.
    FAILED  Tests\Feature\IncidentRegressionTest > the same job delivered twi…   
   Failed asserting that 0 is identical to 121000.
 
-  at tests/Feature/IncidentRegressionTest.php:128
+  at tests/Feature/IncidentRegressionTest.php:127
+    123▕         // after retry_after because the first worker never acknowledged it.
     124▕         $this->deliverAgain($profile, $refreshId);
     125▕ 
-    126▕         $this->assertSame(1, Profile::query()->count());
-    127▕         $profile->refresh();
-  ➜ 128▕         $this->assertSame(121_000, $profile->likes_count);
-    129▕         $this->assertSame(11, $profile->revision);
-    130▕         $this->assertSame(1, RefreshAttempt::query()->where('refresh_id', $refreshId)->count(), 'the second delivery finds the refresh done');
-    131▕         Http::assertSentCount(1);
-    132▕     }
+    126▕         $profile->refresh();
+  ➜ 127▕         $this->assertSame(121_000, $profile->likes_count);
+    128▕         $this->assertSame(11, $profile->revision);
+    129▕         $this->assertSame(1, RefreshAttempt::query()->where('refresh_id', $refreshId)->count(), 'the second delivery finds the refresh done');
+    130▕         Http::assertSentCount(1);
+    131▕     }
 
-  1   tests/Feature/IncidentRegressionTest.php:128
+  1   tests/Feature/IncidentRegressionTest.php:127
 
 
-  Tests:    6 failed, 1 passed (10 assertions)
-  Duration: 1.41s
+  Tests:    6 failed, 1 passed (9 assertions)
+  Duration: 1.50s
 
 

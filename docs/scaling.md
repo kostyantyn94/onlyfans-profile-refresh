@@ -17,7 +17,7 @@ account, 50 ms of upstream latency, 4 Horizon workers.
 | Worker memory | highest peak seen: 36.5 MB |
 
 `php artisan workload:scheduler-memory --profiles=30000` ([09](evidence/09-scheduler-memory.txt)):
-`profiles:enqueue-due` in its own process claims and dispatches **~700 refreshes/s** and peaks at
+`profiles:enqueue-due` in its own process claims and dispatches **650–700 refreshes/s** and peaks at
 **30 MB** whether it queues 3,000 or 30,000, because it claims in batches of 500 and never builds
 models.
 
@@ -39,7 +39,7 @@ rate to size from and show where to look first.
 
 ## Likely bottleneck in this solution
 
-**The scheduler.** One process queues ~700/s: about the 579/s average and below any peak. Every
+**The scheduler.** One process queues 650–700/s: about the 579/s average and below any peak. Every
 dispatch is one Redis round trip plus Horizon's bookkeeping plus a log line.
 
 Close behind it:

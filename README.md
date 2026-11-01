@@ -7,9 +7,9 @@ Horizon workers, plus the incident from the task: reproduced, fixed and measured
 | Same workload ([details](#before-and-after)) | Old handler | Fixed handler |
 |---|---|---|
 | Refreshes the workers reported as successful | 50 of 50 | 50 of 50 |
-| Refreshes with **correct stored data** | 22 of 50 (28 have likes = 0) | **50 of 50** |
-| Busy account: upstream requests per correct refresh | 3.65 | 1.35 |
-| Calm account: oldest waiting refresh | 13.6 s (stuck behind the busy account) | 1.7 s |
+| Refreshes with **correct stored data** | 26 of 50 (24 have likes = 0) | **50 of 50** |
+| Busy account: upstream requests per correct refresh | 3.38 | 1.38 |
+| Calm account: oldest waiting refresh | 15.9 s (stuck behind the busy account) | 1.9 s |
 
 After the old handler's run, `profiles:repair` and the fixed handler brought all 50 profiles back
 to correct data ([03b](docs/evidence/03b-repair-after-legacy.txt)).
@@ -31,7 +31,11 @@ Needs Docker with Compose v2. Everything runs in containers: Horizon needs the `
 docker compose exec app php artisan profiles:fetch madison420ivy
 ```
 
-UI: http://localhost:8000 (profiles, Scout search, "refresh now"). Horizon: http://localhost:8000/horizon.
+UI: http://localhost:8000. Horizon: http://localhost:8000/horizon. The UI is a small operations view:
+counts (profiles tracked, refreshes pending with the oldest wait, failing now, refreshed in 24 h), a
+status per profile with Scout search, and per profile a health verdict, last attempt / success /
+failure / next refresh, the attempt timeline and the raw upstream JSON. It updates itself while a
+refresh is pending.
 Checked from a fresh clone in an empty folder ([10](docs/evidence/10-clean-setup.txt)): `setup.sh`,
 the test suite, and a keyless `profiles:fetch` recorded as `auth_failed` (HTTP 401). Only tested on
 Windows 11 with Docker Desktop.
@@ -39,7 +43,7 @@ Windows 11 with Docker Desktop.
 | Command (in the project folder, on the host) | |
 |---|---|
 | `docker compose exec app php artisan profiles:fetch madison420ivy [--queue]` | fetch now in this process, or hand it to Horizon |
-| `docker compose exec app php artisan test` | {{TESTS}} tests (Postgres and Redis of their own, never the real API) |
+| `docker compose exec app php artisan test` | 100 tests (Postgres and Redis of their own, never the real API) |
 | `docker compose exec -e REFRESH_HANDLER=legacy app php artisan test --group=incident` | the incident tests against the **old** handler: 6 of 7 fail |
 | `docker compose exec app php artisan workload:run --handler=legacy` / `--handler=v2` | the workload, before / after |
 | `docker compose exec app php artisan profiles:repair --since="2026-11-01 18:00"` | re-queue profiles written during the incident |
@@ -217,23 +221,24 @@ Results, both runs from one `run-all.sh` pass ([03](docs/evidence/03-workload-be
 | | Old: busy | Old: calm | Fixed: busy | Fixed: calm |
 |---|---|---|---|---|
 | Reported successful | 40 | 10 | 40 | 10 |
-| **Stored data correct** (121,000 / rev 11) | **17** | **5** | **40** | **10** |
-| Stored data wrong (likes 0) | 23 | 5 | 0 | 0 |
-| Upstream requests (counted by the fake upstream) | 62 | 10 | 54 | 10 |
-| **Requests per correct refresh** | **3.65** | **2.0** | **1.35** | **1.0** |
-| Upstream answers | 34×200, 24×429, 4×500 | 10×200 | 40×200, 10×429, 4×500 | 10×200 |
-| **Oldest waiting refresh (max)** | 13.3 s | **13.6 s** | 31.9 s | **1.7 s** |
-| All finished after | 13.2 s | 13.5 s | 31.9 s | 1.8 s |
+| **Stored data correct** (121,000 / rev 11) | **21** | **5** | **40** | **10** |
+| Stored data wrong (likes 0) | 19 | 5 | 0 | 0 |
+| Upstream requests (counted by the fake upstream) | 71 | 10 | 55 | 10 |
+| **Requests per correct refresh** | **3.38** | **2.0** | **1.38** | **1.0** |
+| Upstream answers | 36×200, 33×429, 2×500 | 10×200 | 40×200, 10×429, 5×500 | 10×200 |
+| **Oldest waiting refresh (max)** | 16.4 s | **15.9 s** | 44.8 s | **1.9 s** |
+| All finished after | 16.0 s | 15.5 s | 44.1 s | 1.2 s |
 | API keys in logs | 0 | 0 | 0 | 0 |
 
-- **Old:** everything "succeeds" and more than half the data is wrong. The calm account cannot start
+- **Old:** everything "succeeds" and about half the data is wrong. The calm account cannot start
   until the busy burst has slept through its retries.
 - **Fixed:** all 50 correct. The calm account is served while the busy one is rate limited. A 429
   pauses the whole busy account instead of each job hammering on, and its refreshes recover as soon
   as the storm ends.
 - The busy account takes *longer* to finish with the fix, because it now respects the limit instead
   of writing zeros. At 5 requests/s after a 6 s storm the floor is ~14 s; the rest is backoff that
-  grows with each 429. Pacing each account with a token bucket would close that gap.
+  grows with each 429, and the patient 5xx retries (5 s base) for its five empty 500s. Pacing each
+  account with a token bucket would close most of that gap.
 - "Oldest waiting refresh" runs from the moment a refresh is queued until it finishes (applied or
   failed for good); a retry in Redis's delayed set is still waiting.
 
@@ -296,7 +301,7 @@ profiles ([09](docs/evidence/09-scheduler-memory.txt)). Bodies over 1 MB are ref
 ## The next scaling limit
 
 Full write-up: [docs/scaling.md](docs/scaling.md). In short: one machine did **55 refreshes/s with 4
-workers** (~73 ms each, 54 ms of it the upstream call), and the scheduler queues **~700/s** per process
+workers** (~73 ms each, 54 ms of it the upstream call), and the scheduler queues **650–700/s** per process
 ([07](docs/evidence/07-throughput.txt), [09](docs/evidence/09-scheduler-memory.txt)). At 579/s on
 average, the **scheduler is the first thing to break**: it barely matches the average and is below
 any peak. Next come Postgres writes (3 per refresh, plus `refresh_attempts` at ≥ 50 M rows/day) and,
@@ -380,6 +385,6 @@ app/Jobs/           RefreshProfile (fixed), LegacyRefreshProfile (incident),
 app/Console/        profiles:fetch|enqueue-due|repair, workload:run|check|crash|throughput|scheduler-memory
 fake-upstream/      stand-in for the Fans API endpoint, used by the workload
 resources/fixtures/ upstream response fixtures, incl. the real madison420ivy response
-tests/              {{TESTS}} PHPUnit tests
+tests/              100 PHPUnit tests
 docs/               scaling.md; evidence/ (tests, workload, crash, throughput, memory, clean setup, live fetch)
 ```

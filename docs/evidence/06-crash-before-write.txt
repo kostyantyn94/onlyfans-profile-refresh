@@ -1,4 +1,4 @@
-Refresh a82591f4-21f6-4714-b604-f9a18e1f2e9a queued; the worker that picks it up will be killed before-write.
+Refresh 311c0540-5713-4140-9748-cfbd9b0e013b queued; the worker that picks it up will be killed before-write.
 Worker killed after 1.0 s. Profile now: likes=120000 revision=10, claim still held, attempts recorded: 0, jobs reserved in Redis: 1.
 Waiting for Redis to hand the job out again (retry_after = 90 s)...
 +------------------------------------------+--------------------------+
