@@ -3,51 +3,93 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
     <title>@yield('title', 'Profiles') · Profile Refresher</title>
-    <style>
-        :root { --fg: #1d1d1f; --muted: #6e6e73; --line: #e3e3e8; --bg: #fafafa; --card: #fff; --ok: #1a7f37; --warn: #9a6700; --bad: #cf222e; --accent: #0969da; }
-        * { box-sizing: border-box; }
-        body { margin: 0; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--fg); background: var(--bg); }
-        header { display: flex; gap: 16px; align-items: center; padding: 12px 24px; background: var(--card); border-bottom: 1px solid var(--line); }
-        header a { color: var(--fg); text-decoration: none; font-weight: 600; }
-        header nav { margin-left: auto; display: flex; gap: 16px; }
-        header nav a { font-weight: 400; color: var(--accent); }
-        main { max-width: 1200px; margin: 0 auto; padding: 24px; }
-        h1 { font-size: 20px; margin: 0 0 16px; }
-        h2 { font-size: 15px; margin: 24px 0 8px; }
-        .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
-        table { width: 100%; border-collapse: collapse; background: var(--card); }
-        th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
-        th { font-size: 12px; color: var(--muted); font-weight: 600; white-space: nowrap; }
-        td.num { text-align: right; font-variant-numeric: tabular-nums; }
-        .muted { color: var(--muted); }
-        .badge { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 12px; border: 1px solid currentColor; white-space: nowrap; }
-        .ok { color: var(--ok); } .warn { color: var(--warn); } .bad { color: var(--bad); }
-        form.inline { display: inline-flex; gap: 8px; }
-        input[type=text] { padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; min-width: 220px; }
-        button { padding: 6px 12px; border: 1px solid var(--accent); background: var(--accent); color: #fff; border-radius: 6px; cursor: pointer; }
-        .toolbar { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; margin-bottom: 16px; }
-        .flash { padding: 8px 12px; border-radius: 6px; background: #ddf4ff; margin-bottom: 16px; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
-        .stat b { display: block; font-size: 18px; font-variant-numeric: tabular-nums; }
-        pre { white-space: pre-wrap; word-break: break-all; font-size: 12px; max-height: 480px; overflow: auto; background: #f6f8fa; padding: 12px; border-radius: 6px; }
-        .wrap { overflow-x: auto; }
-        a { color: var(--accent); }
-    </style>
+    <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
+    <link rel="stylesheet" href="{{ asset('css/app.css') }}?v={{ filemtime(public_path('css/app.css')) }}">
+    <script>
+        // A broken avatar (expired CDN link, blocked host) is removed so the initials under it show.
+        document.addEventListener('error', function (event) {
+            if (event.target instanceof HTMLImageElement && event.target.hasAttribute('data-fallback')) event.target.remove();
+        }, true);
+    </script>
 </head>
 <body>
-<header>
-    <a href="{{ route('profiles.index') }}">Profile Refresher</a>
-    <nav>
-        <a href="{{ route('profiles.index') }}">Profiles</a>
-        <a href="/horizon">Horizon</a>
-    </nav>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="topbar">
+    <div class="topbar__inner">
+        <a class="brand" href="{{ route('profiles.index') }}">
+            <span class="brand__mark"><x-icon name="refresh" :size="17" /></span>
+            <span class="brand__text">
+                <span class="brand__name">Profile Refresher</span>
+                <span class="brand__sub">OnlyFans profiles via the Fans API</span>
+            </span>
+        </a>
+        <nav class="topnav" aria-label="Main">
+            <a href="{{ route('profiles.index') }}" @if (request()->routeIs('profiles.*')) aria-current="page" @endif>Profiles</a>
+            <a href="/horizon">Horizon <x-icon name="external" :size="13" /></a>
+        </nav>
+    </div>
 </header>
-<main>
+<main id="main" class="container">
     @if (session('status'))
-        <div class="flash">{{ session('status') }}</div>
+        <div class="flash" role="status"><x-icon name="check-circle" /><span>{{ session('status') }}</span></div>
     @endif
     @yield('content')
 </main>
+<footer class="footer">
+    <div class="footer__inner">
+        <span>Refreshed by Horizon workers: every 24 h above {{ number_format(config('refresh.likes_threshold')) }} likes, every 72 h otherwise.</span>
+        <span>Times in UTC · failures never overwrite stored data</span>
+    </div>
+</footer>
+<script>
+    // While a refresh is pending ([data-poll] on the page), re-fetch this page every
+    // few seconds and swap the [data-live] regions in place. Stops when nothing is
+    // pending any more, after ten minutes, or after repeated errors.
+    (function () {
+        if (!document.querySelector('[data-poll]') || !window.fetch || !window.DOMParser) return;
+        var every = 3000, left = 200, errors = 0;
+
+        function swap(doc) {
+            document.querySelectorAll('[data-live]').forEach(function (region) {
+                var fresh = doc.querySelector('[data-live="' + region.getAttribute('data-live') + '"]');
+                // Leave a region alone while the user is interacting with it.
+                if (fresh && !region.contains(document.activeElement)) region.replaceWith(fresh);
+            });
+        }
+
+        function pause() {
+            document.querySelectorAll('[data-poll]').forEach(function (el) {
+                el.setAttribute('data-paused', '');
+                el.querySelector('.live__text').textContent = 'Auto-update paused, reload to update';
+            });
+        }
+
+        function tick() {
+            if (document.hidden) return setTimeout(tick, every);
+            if (left-- <= 0) return pause();
+            fetch(location.href, { credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'text/html' } })
+                .then(function (response) {
+                    if (!response.ok) throw new Error('HTTP ' + response.status);
+                    return response.text();
+                })
+                .then(function (html) {
+                    errors = 0;
+                    var doc = new DOMParser().parseFromString(html, 'text/html');
+                    // Ask before swapping: swapping moves the nodes out of doc.
+                    var stillPending = doc.querySelector('[data-poll]') !== null;
+                    swap(doc);
+                    if (stillPending) setTimeout(tick, every);
+                })
+                .catch(function () {
+                    if (++errors >= 5) return pause();
+                    setTimeout(tick, every * 2);
+                });
+        }
+
+        setTimeout(tick, every);
+    })();
+</script>
 </body>
 </html>
