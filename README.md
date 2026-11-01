@@ -355,8 +355,8 @@ Claude Code working as an agent; see [AI.md](AI.md).
 | Data retrieval, incident reproduction, the fix, tests | 0:20 |
 | Workload, fake upstream, crash test, UI | 0:10 |
 | Own review, throughput and memory checks, repair, evidence, README, clean-clone check | 0:15 |
-| Independent review and its fixes, final evidence, packaging | 0:35 |
-| **Total** | **2:05** |
+| Independent review and its fixes, final evidence, packaging | 0:30 |
+| **Total** (20:20–22:20) | **2:00** |
 
 ## Layout
 
