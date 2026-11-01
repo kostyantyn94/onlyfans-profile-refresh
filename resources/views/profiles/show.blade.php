@@ -190,7 +190,7 @@
                     <dt>Consecutive failures</dt>
                     <dd>
                         <span class="milestone__main">{{ $profile->consecutive_failures }}</span>
-                        <span class="milestone__sub">{{ $profile->consecutive_failures > 0 ? 'failed attempts since the last success' : 'reset by every valid response' }}</span>
+                        <span class="milestone__sub">{{ $profile->consecutive_failures > 0 ? 'failed refreshes since the last success (retries not counted)' : 'reset by every valid response' }}</span>
                     </dd>
                 </div>
                 <div class="milestone">

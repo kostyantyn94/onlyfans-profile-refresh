@@ -159,7 +159,7 @@ final class ProfileView
 
         if (self::isFailing($profile)) {
             $count = $profile->consecutive_failures;
-            $streak = $count > 1 ? "{$count} failed attempts in a row. " : '';
+            $streak = $count > 1 ? "{$count} failed refreshes in a row. " : '';
             $data = $profile->last_success_at
                 ? 'Stored data is from the last success, '.self::relative($profile->last_success_at).'.'
                 : 'No valid response has been stored yet.';
