@@ -1,8 +1,10 @@
 <?php
 
-use Illuminate\Foundation\Inspiring;
-use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schedule;
 
-Artisan::command('inspire', function () {
-    $this->comment(Inspiring::quote());
-})->purpose('Display an inspiring quote');
+// Claims are taken with a conditional UPDATE, so an overlapping run cannot
+// double-queue a profile; withoutOverlapping just avoids wasted work.
+Schedule::command('profiles:enqueue-due')->everyMinute()->withoutOverlapping();
+
+// Horizon's metrics graphs (throughput, wait time) need snapshots.
+Schedule::command('horizon:snapshot')->everyFiveMinutes();

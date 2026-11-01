@@ -2,24 +2,21 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use App\Models\Account;
+use App\Models\Profile;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
-        // User::factory(10)->create();
+        // The real Fans API account. api_key stays null: the key is read from
+        // FANSAPI_KEY at request time and never stored in the database.
+        $account = Account::query()->updateOrCreate(
+            ['slug' => 'fansapi'],
+            ['name' => 'Fans API', 'base_url' => config('services.fansapi.base_url'), 'api_key' => null],
+        );
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        Profile::query()->createOrFirst(['account_id' => $account->id, 'username' => 'madison420ivy']);
     }
 }

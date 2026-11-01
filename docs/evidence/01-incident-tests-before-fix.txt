@@ -1,0 +1,124 @@
+# php artisan test --group=incident, at the commit with the incident-era handler (LegacyRefreshProfile)
+# 2026-11-01T19:20:24Z
+
+
+   FAIL  Tests\Feature\IncidentRegressionTest
+  ✓ old format is still accepted                                         0.56s  
+  ⨯ new format with likes inside profile is stored                       0.10s  
+  ⨯ rate limit without retry after keeps data and is retried later       0.14s  
+  ⨯ server error with empty body keeps data and is retried later         0.12s  
+  ⨯ missing likes is invalid not zero                                    0.14s  
+  ⨯ an older revision arriving last does not overwrite newer data        0.13s  
+  ⨯ the same job delivered twice neither duplicates nor corrupts         0.17s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\IncidentRegressionTest > new format with likes insi…   
+  likes moved into "profile" and must still be read
+Failed asserting that 0 is identical to 121000.
+
+  at tests/Feature/IncidentRegressionTest.php:45
+     41▕ 
+     42▕         $this->runRefresh($profile);
+     43▕ 
+     44▕         $profile->refresh();
+  ➜  45▕         $this->assertSame(121_000, $profile->likes_count, 'likes moved into "profile" and must still be read');
+     46▕         $this->assertSame(11, $profile->revision);
+     47▕         $this->assertTrue($profile->last_success_at->isToday());
+     48▕     }
+     49▕
+
+  1   tests/Feature/IncidentRegressionTest.php:45
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\IncidentRegressionTest > rate limit without retry a…   
+  a 429 must not erase the last valid likes
+Failed asserting that 0 is identical to 120000.
+
+  at tests/Feature/IncidentRegressionTest.php:59
+     55▕ 
+     56▕         $job = $this->runRefresh($profile);
+     57▕ 
+     58▕         $profile->refresh();
+  ➜  59▕         $this->assertSame(120_000, $profile->likes_count, 'a 429 must not erase the last valid likes');
+     60▕         $this->assertSame(10, $profile->revision);
+     61▕         $this->assertEquals($lastSuccess, $profile->last_success_at, 'a 429 is not a successful refresh');
+     62▕         $this->assertSame('rate_limited', $profile->last_attempt_status);
+     63▕         $this->assertNotNull($profile->last_failure_at);
+
+  1   tests/Feature/IncidentRegressionTest.php:59
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\IncidentRegressionTest > server error with empty bo…   
+  an empty 500 must not erase the last valid likes
+Failed asserting that 0 is identical to 120000.
+
+  at tests/Feature/IncidentRegressionTest.php:77
+     73▕ 
+     74▕         $job = $this->runRefresh($profile);
+     75▕ 
+     76▕         $profile->refresh();
+  ➜  77▕         $this->assertSame(120_000, $profile->likes_count, 'an empty 500 must not erase the last valid likes');
+     78▕         $this->assertSame(10, $profile->revision);
+     79▕         $this->assertEquals($lastSuccess, $profile->last_success_at);
+     80▕         $this->assertSame('server_error', $profile->last_attempt_status);
+     81▕         $this->assertTrue($job->job->isReleased());
+
+  1   tests/Feature/IncidentRegressionTest.php:77
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\IncidentRegressionTest > missing likes is invalid n…   
+  a missing likes field must not become 0
+Failed asserting that 0 is identical to 120000.
+
+  at tests/Feature/IncidentRegressionTest.php:92
+     88▕ 
+     89▕         $this->runRefresh($profile);
+     90▕ 
+     91▕         $profile->refresh();
+  ➜  92▕         $this->assertSame(120_000, $profile->likes_count, 'a missing likes field must not become 0');
+     93▕         $this->assertSame(10, $profile->revision);
+     94▕         $this->assertSame('invalid_response', $profile->last_attempt_status);
+     95▕         $this->assertStringContainsString('likes is missing', $profile->last_failure_reason);
+     96▕     }
+
+  1   tests/Feature/IncidentRegressionTest.php:92
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\IncidentRegressionTest > an older revision arriving…   
+  revision 10 arrived last but must not win
+Failed asserting that 119000 is identical to 121000.
+
+  at tests/Feature/IncidentRegressionTest.php:111
+    107▕         $this->runRefresh($profile);
+    108▕         $this->runRefresh($profile);
+    109▕ 
+    110▕         $profile->refresh();
+  ➜ 111▕         $this->assertSame(121_000, $profile->likes_count, 'revision 10 arrived last but must not win');
+    112▕         $this->assertSame(11, $profile->revision);
+    113▕     }
+    114▕ 
+    115▕     public function test_the_same_job_delivered_twice_neither_duplicates_nor_corrupts(): void
+
+  1   tests/Feature/IncidentRegressionTest.php:111
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\IncidentRegressionTest > the same job delivered twi…   
+  Failed asserting that 0 is identical to 121000.
+
+  at tests/Feature/IncidentRegressionTest.php:128
+    124▕         $this->runRefresh($profile, $refreshId);
+    125▕ 
+    126▕         $this->assertSame(1, Profile::query()->where('username', $profile->username)->count());
+    127▕         $profile->refresh();
+  ➜ 128▕         $this->assertSame(121_000, $profile->likes_count);
+    129▕         $this->assertSame(11, $profile->revision);
+    130▕         $this->assertSame(2, RefreshAttempt::query()->where('refresh_id', $refreshId)->count(), 'both deliveries are on record');
+    131▕     }
+    132▕ }
+
+  1   tests/Feature/IncidentRegressionTest.php:128
+
+
+  Tests:    6 failed, 1 passed (10 assertions)
+  Duration: 1.43s
+
+
