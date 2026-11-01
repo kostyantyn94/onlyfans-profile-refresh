@@ -12,6 +12,7 @@ use App\Upstream\UpstreamResponse;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Redis;
 use Throwable;
 
 /**
@@ -63,6 +64,8 @@ class ProfileRefresher
             return;
         }
 
+        $this->crashForTest($job, 'before-write', $context);
+
         $outcome = $this->store->apply($profile, $snapshot, $job->refreshId, CarbonImmutable::now());
 
         $this->recordAttempt($job, $profile, $attempt, $outcome, $response, revision: $snapshot->revision, likes: $snapshot->likes);
@@ -77,6 +80,8 @@ class ProfileRefresher
             'duration_ms' => $response->durationMs,
             'memory_peak_mb' => round(memory_get_peak_usage(true) / 1048576, 1),
         ]);
+
+        $this->crashForTest($job, 'after-write', $context);
     }
 
     /** The job is out of time or kept throwing: finish the refresh as failed. */
@@ -174,6 +179,21 @@ class ProfileRefresher
             'job_attempt' => $job->job ? $job->attempts() : null,
             'upstream_attempt' => $attempt,
         ], fn ($value) => $value !== null);
+    }
+
+    /**
+     * Test seam for `php artisan workload:crash`, local environment only: a one-shot
+     * Redis flag makes this worker process die (SIGKILL) at the given point, before
+     * the queue is told the job finished, exactly like a crashed or OOM-killed worker.
+     */
+    private function crashForTest(RefreshProfile $job, string $point, array $context): void
+    {
+        if (! app()->isLocal() || Redis::del('refresh:crash:'.$point.':'.$job->profileId) !== 1) {
+            return;
+        }
+
+        Log::channel('refresh')->warning('refresh.worker_killed_for_test', [...$context, 'point' => $point]);
+        posix_kill(getmypid(), SIGKILL);
     }
 
     /** Guzzle messages include the URL; make sure no query string or token ends up in logs. */
