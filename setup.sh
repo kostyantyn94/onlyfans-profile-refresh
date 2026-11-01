@@ -6,6 +6,8 @@ export MSYS_NO_PATHCONV=1
 cd "$(dirname "$0")"
 
 [ -f .env ] || cp .env.example .env
+# The containers run as www-data; on a Linux host the bind mount keeps host ownership.
+chmod -R a+w storage bootstrap/cache .env 2>/dev/null || true
 
 docker compose pull --quiet postgres redis
 docker compose up -d postgres redis

@@ -32,20 +32,19 @@ docker compose exec app php artisan profiles:fetch madison420ivy
 ```
 
 UI: http://localhost:8000 (profiles, Scout search, "refresh now"). Horizon: http://localhost:8000/horizon.
-Checked from a fresh clone in an empty folder: setup in 33 s, then all tests green, a keyless
-`profiles:fetch` recorded as `auth_failed` (HTTP 401), and the workload. Only tested on Windows 11
-with Docker Desktop; on a Linux host the containers' `www-data` may need
-`chmod -R a+w storage bootstrap/cache .env`.
+Checked from a fresh clone in an empty folder ([10](docs/evidence/10-clean-setup.txt)): `setup.sh`,
+the test suite, and a keyless `profiles:fetch` recorded as `auth_failed` (HTTP 401). Only tested on
+Windows 11 with Docker Desktop.
 
-| Prefix with `docker compose exec app` | |
+| Command (in the project folder, on the host) | |
 |---|---|
-| `php artisan profiles:fetch madison420ivy [--queue]` | fetch now in this process, or hand it to Horizon |
-| `php artisan test` | 94 tests (Postgres and Redis of their own, never the real API) |
+| `docker compose exec app php artisan profiles:fetch madison420ivy [--queue]` | fetch now in this process, or hand it to Horizon |
+| `docker compose exec app php artisan test` | {{TESTS}} tests (Postgres and Redis of their own, never the real API) |
 | `docker compose exec -e REFRESH_HANDLER=legacy app php artisan test --group=incident` | the incident tests against the **old** handler: 6 of 7 fail |
-| `php artisan workload:run --handler=legacy` / `--handler=v2` | the workload, before / after |
-| `php artisan profiles:repair --since="2026-11-01 18:00"` | re-fetch profiles written during the incident |
-| `php artisan workload:crash --at=after-write` | kill a worker mid-refresh, watch the redelivery |
-| `sh docs/evidence/run-all.sh` | re-create every evidence file (~8 min) |
+| `docker compose exec app php artisan workload:run --handler=legacy` / `--handler=v2` | the workload, before / after |
+| `docker compose exec app php artisan profiles:repair --since="2026-11-01 18:00"` | re-queue profiles written during the incident |
+| `docker compose exec app php artisan workload:crash --at=after-write` | kill a worker mid-refresh, watch the redelivery |
+| `sh docs/evidence/run-all.sh` | re-create the evidence files (~8 min) |
 
 Services: `app` (UI, Horizon dashboard), `horizon`, `scheduler` (queues due profiles every
 minute), `postgres`, `redis` (AOF on), `fake-upstream` (a stand-in for the Fans API endpoint used
@@ -59,11 +58,13 @@ boot took ~6 s (0.4 s now).
 with a read-only key. Its docs use `madison420ivy` as the example username.
 
 - It needs no connected OnlyFans account, unlike `/api/{account}/users/{username}` (needs an
-  `acct_...`, never cached). Cached answers cost 0 credits, `?fresh=true` costs 1
-  (`FANSAPI_FRESH=false` by default). All live calls in this task were cache hits: 0 credits.
+  `acct_...`, never cached). Cached answers cost 0 credits, `?fresh=true` costs 1. A cached
+  snapshot older than 60 min (`FANSAPI_MAX_CACHE_AGE_MINUTES`) does not count as a refresh: the job
+  records `cache_too_old` and asks again with `?fresh=true`. Live, the cache was 12 h old and said
+  611,905 likes; the fresh call said 611,954 ([11](docs/evidence/11-live-fresh-fetch.txt), 1 credit).
 - Calling onlyfans.com directly was rejected: its `api2` endpoints need per-request signatures
-  built from rules that change, plus session cookies. Fragile, against OnlyFans' terms, and
-  exactly what Fans API sells.
+  built from rules that change, plus session cookies. Keeping that working is a product of its own,
+  and it is the one Fans API already provides.
 - **Likes are `data.favoritedCount`**; there is no `likes` field. There is no revision either, so
   the time Fans API took its snapshot (`_meta._cache.cached_at`, ms) is used as one: it only grows
   when a newer snapshot exists. Without it, the time the request was sent is used.
@@ -75,11 +76,11 @@ with a read-only key. Its docs use `madison420ivy` as the example username.
 $ php artisan profiles:fetch madison420ivy
 | name                    | Madison Ivy                |
 | upstream id             | 5140520                    |
-| likes                   | 611,905                    |
+| likes                   | 611,954                    |
 | posts / photos / videos | 178 / 623 / 202            |
 | fields stored (raw)     | 87                         |
 | next refresh            | 2026-11-02 19:16:16        |   (above 100,000 likes: every 24 h)
-| this attempt            | success, HTTP 200, 276 ms  |
+| this attempt            | success, HTTP 200, 1492 ms |   (?fresh=true after a 12-hour-old cache hit)
 ```
 
 ## The failure
@@ -105,7 +106,8 @@ likes 120,000, revision 10):
 Evidence: [01](docs/evidence/01-incident-tests-before-fix.txt) — 6 of 7 fail at commit `83496a9`,
 where only the old handler exists; [01b](docs/evidence/01b-incident-tests-legacy-now.txt) — still
 6 of 7 against the old handler today; [02](docs/evidence/02-incident-tests-after-fix.txt) — 7 of 7
-pass with the fix.
+pass with the fix. (The 7th test was tightened after 01 was recorded: a second delivery of a finished
+refresh is now skipped instead of re-run; 01b and 02 show the current version.)
 
 The three symptoms without a deployment: the upstream moved `likes` into `profile` and started
 sending 429s and empty 500s, and the handler writes 0 for all of them (*stale or empty data*); the
@@ -127,23 +129,25 @@ fetch, validate, then write or classify the failure.
 - **Only a newer revision writes** ([`ProfileStore`](app/Refresh/ProfileStore.php)): one statement,
   `UPDATE ... WHERE revision IS NULL OR revision < :new`, so of two racing responses only the newer
   can win whatever order the workers commit in. The same revision again is `unchanged` (confirmed,
-  nothing rewritten), an older one `stale_ignored`.
-- **Failures never touch data.** They update `last_attempt_*`, `last_failure_at`,
-  `last_failure_reason` and `consecutive_failures` only; `last_success_at` moves only on a valid
-  response.
+  nothing rewritten), an older one `stale_ignored`. The same revision with *different* likes does
+  write: the upstream says that version has other data, so the stored row is the wrong one (this
+  is how zeros the old handler stored at revision 11 get corrected).
+- **Failures never touch data.** They update `last_attempt_*`, `last_failure_at` and
+  `last_failure_reason` only (and `consecutive_failures` once per failed refresh, not per attempt);
+  `last_success_at` moves only on a valid response.
 - **No duplicates.** Profiles are unique per `(account_id, username)` and created with
   `createOrFirst`. A refresh is queued only after a conditional `UPDATE` claims the profile
   (`refresh_queued_at`, `pending_refresh_id`), so the scheduler, UI and CLI cannot queue it twice.
   Only the claim's owner releases it, and a job whose refresh no longer holds the claim (finished by
-  an earlier delivery, or taken over after the claim expired at 30 min) stops without calling the
-  upstream.
+  an earlier delivery, or replaced after the claim expired at 6 h) is dropped before the account
+  gate, without calling the upstream.
 - **Schedule** ([`RefreshPolicy`](app/Refresh/RefreshPolicy.php)): above 100,000 likes every 24 h,
   100,000 and below every 72 h. A refresh that fails for good is retried after 1 h, doubling with
-  each consecutive failure up to 72 h. A stale answer pushes the next refresh out, never earlier.
-- **Repair** ([`profiles:repair`](app/Console/Commands/RepairProfiles.php)): re-fetching alone does
-  not fix rows the old handler broke, because it stored 0 with the real revision 11 and a fresh
-  revision 11 is "unchanged". The command clears the revision of every profile marked successful
-  since the incident started and queues it again.
+  each consecutive failed refresh up to 72 h. A stale answer pushes the next refresh out, never earlier.
+- **Repair** ([`profiles:repair`](app/Console/Commands/RepairProfiles.php)): the old handler marked
+  its zeros as successes and scheduled the next refresh 24–72 h out, so they would stay visible that
+  long. The command clears the revision of every profile marked successful since the incident
+  started (so anything stored at the real revision is rewritten, not only likes) and queues it now.
 
 ## Keep the queue moving
 
@@ -153,20 +157,24 @@ in the job, so a waiting refresh holds no worker.
 | Upstream result | Outcome | What happens | Tries per refresh |
 |---|---|---|---|
 | 429 | `rate_limited` | the **whole account** pauses (`Retry-After` if sent, else a randomised exponential delay); the job retries after it | 8 |
-| 5xx, incl. an empty 500 | `server_error` | randomised exponential backoff, 2 s base, 60 s cap | 3 |
-| timeout, 408, 504 | `timeout` | same | 3 |
+| 5xx, incl. an empty 500 | `server_error` | randomised exponential backoff, 5 s base, 60 s cap (rides out ~30 s of errors) | 4 |
+| timeout, 408, 504 | `timeout` | same | 4 |
 | 404, 410 / 401, 403 / other 4xx / invalid body | `not_found` / `auth_failed` / `client_error` / `invalid_response` | fails at once, data kept | 1 |
 
 At most 10 upstream attempts per refresh. "Randomised" is equal jitter: half the delay fixed, half
 random, so retries neither fire instantly nor arrive together. There is deliberately no
-`retryUntil()` and no fixed `$tries`: both also count time spent waiting in the queue, and would
-fail refreshes that never reached the upstream exactly when the queue is backed up.
+`retryUntil()` and no fixed number of tries (`$tries = 0`): both also count time spent waiting in
+the queue, and would fail refreshes that never reached the upstream exactly when the queue is backed
+up. Unexpected exceptions, and workers dying on the job (`#[CountCrashesAsExceptions]`), stop it
+after 3 (`$maxExceptions`).
 
 **Account isolation** ([`AccountGate`](app/Jobs/Middleware/AccountGate.php)). Before calling the
 upstream a job checks its account: in cooldown after a 429 → back to the queue until it ends
 (+0–2 s spread); at its concurrency limit (2 by default, `accounts.max_concurrency`) → back in
 1–3 s. Neither calls the upstream or spends a try. A rate-limited account therefore occupies a
-worker for milliseconds, not seconds, and other accounts keep being served.
+worker for milliseconds, not seconds, and other accounts keep being served. The price: those jobs go
+back into the one shared queue again and again, which is fine for a burst of 40 but would become
+churn with tens of thousands queued for one account (see [scaling](docs/scaling.md)).
 
 ### Timeouts and `retry_after`
 
@@ -247,7 +255,8 @@ one-shot Redis key. Then the command waits for Redis to hand the job out again
 
 **What this proves:** a worker process that dies mid-job (`SIGKILL`, as the OOM killer sends) loses
 neither the refresh nor data integrity; Redis redelivers after `retry_after`, the lock and the
-concurrency slot expire on their own, and the second run is harmless.
+concurrency slot expire on their own, and the second run is harmless. A job that keeps killing its
+worker stops after 3 crashes (`#[CountCrashesAsExceptions]`).
 
 **What it does not prove:** losing Redis itself (the reserved job lives in Redis; AOF with
 `everysec` can lose up to a second), a crash during the commit, a commit whose acknowledgement never
@@ -259,8 +268,8 @@ a worker that dies between the upstream call and recording the attempt leaves th
 Every refresh event is one JSON line in `storage/logs/refresh.log` with `refresh_id`, `account`,
 `account_id`, `profile_id`, `username`, `job_id`, `job_attempt`, `upstream_attempt`, `outcome`,
 `http_status`, `retry_in_seconds`, `duration_ms` (and `format`, `revision`, `likes`,
-`memory_peak_mb` on success). Events: `queued`, `deferred` (debug), `retry_scheduled`, `success` /
-`unchanged` / `stale_ignored`, `failed`, `gave_up`, `skipped_not_pending`. One refresh through a 429
+`memory_peak_mb` on success). Events: `queued`, `deferred` (debug), `retry_scheduled`,
+`cache_too_old`, `success` / `unchanged` / `stale_ignored`, `failed`, `gave_up`, `skipped_not_pending`. One refresh through a 429
 storm and its recovery (`profiles:fetch calm-001`: first attempt in the CLI, retries in Horizon;
 real lines, abridged):
 
@@ -274,14 +283,15 @@ $ grep 6e4fcb4b-49d5-4e97-9d89-a9d91a009394 storage/logs/refresh.log
 ```
 
 The same refresh is in `refresh_attempts` (one row per upstream request) and on the profile page;
-Horizon jobs are tagged `profile:`, `account:`, `refresh:`, and Horizon alerts when the refresh queue
-waits over 60 s. **Secrets:** the key only goes into the `Authorization` header; it is encrypted at
+Horizon jobs are tagged `profile:`, `account:`, `refresh:`, and Horizon raises `LongWaitDetected`
+when the refresh queue waits over 60 s (no notification channel is configured in this project). **Secrets:** the key only goes into the `Authorization` header; it is encrypted at
 rest or read from `FANSAPI_KEY` and never stored; connection errors are scrubbed before logging. A
 test and every workload run check the logs for keys: 0 found.
 
-**Memory:** a worker peaks at 36.5 MB and stays there; workers recycle after 1,000 jobs or an hour
-(64 MB limit). The scheduler peaks at 30 MB whether it queues 3,000 or 30,000 profiles
-([09](docs/evidence/09-scheduler-memory.txt)). Bodies over 1 MB are refused before decoding.
+**Memory:** the highest worker peak seen over 3,000 refreshes was 36.5 MB; workers recycle after
+1,000 jobs or an hour (64 MB limit). The scheduler peaks at 30 MB whether it queues 3,000 or 30,000
+profiles ([09](docs/evidence/09-scheduler-memory.txt)). Bodies over 1 MB are refused before decoding
+(they are still read into memory first; a streaming size cap is not done).
 
 ## The next scaling limit
 
@@ -290,8 +300,8 @@ workers** (~73 ms each, 54 ms of it the upstream call), and the scheduler queues
 ([07](docs/evidence/07-throughput.txt), [09](docs/evidence/09-scheduler-memory.txt)). At 579/s on
 average, the **scheduler is the first thing to break**: it barely matches the average and is below
 any peak. Next come Postgres writes (3 per refresh, plus `refresh_attempts` at ≥ 50 M rows/day) and,
-outside our control, the upstream's per-team limit (5,000 requests/min = 83/s per team). **First
-change:** pipeline each claimed batch into Redis, log per batch instead of per job, run several
+outside our control, the upstream's per-team limit: our key allows 60 requests/min (the docs list 60,
+1,000 and 5,000 per minute by plan, i.e. 1–83/s per team). **First change:** pipeline each claimed batch into Redis, log per batch instead of per job, run several
 scheduler shards (the `SKIP LOCKED` claim already allows it), and jitter `next_refresh_at`.
 
 ## Production plan
@@ -329,12 +339,13 @@ against what is stored.
 - **Only tested on Windows 11 + Docker Desktop.** macOS should work; Linux may need the `chmod` above.
 - **`favoritedCount` = likes comes from the field name and the Fans API docs**; I could not open
   onlyfans.com to compare with the profile page.
-- **Real Fans API failures were never seen.** Every live call was a cache hit; 429/500/timeout
-  handling is tested against fakes. Whether Fans API sends `Retry-After` is unknown (both handled).
-- **`?fresh=true` is off.** A refresh may get Fans API's cached snapshot (recorded as `unchanged`);
-  whether that is fresh enough for a 24 h interval is a product decision.
-- **Rate limits are discovered, not paced**: the busy account took 31.9 s against a floor of about 14 s. No circuit
-  breaker per account for 401/403 yet; each profile backs off on its own.
+- **Real Fans API failures were never seen.** Every live call returned 200; 429/500/timeout handling
+  is tested against fakes. Whether Fans API sends `Retry-After` is unknown (both handled).
+- **The 60-minute cache limit is my choice.** Each refresh whose cache is older costs 1 credit;
+  the right age for a 24 h interval is a product decision.
+- **Rate limits are discovered, not paced**, and the gate re-queues waiting jobs instead of holding
+  them per account; fine for this workload, churn at tens of thousands. No account-level circuit
+  breaker for 5xx or 401/403 yet; each profile backs off on its own.
 - **A worker killed between the upstream call and recording the attempt leaves the call unrecorded.**
 - **Concurrency is tested sequentially** (two deliveries one after the other); the guarantees rest on
   single conditional statements and the per-profile lock.
@@ -364,10 +375,11 @@ Claude Code working as an agent; see [AI.md](AI.md).
 app/Upstream/       FansApiClient, ProfilePayloadParser (validation), ProfileSnapshot
 app/Refresh/        ProfileRefresher (one attempt), ProfileStore (all writes), RefreshScheduler (claims),
                     Outcome, RefreshPolicy (24 h / 72 h), Backoff, AccountThrottle (cooldowns)
-app/Jobs/           RefreshProfile (fixed), LegacyRefreshProfile (incident), Middleware/AccountGate
+app/Jobs/           RefreshProfile (fixed), LegacyRefreshProfile (incident),
+                    Middleware/SkipUnclaimedRefresh, Middleware/AccountGate
 app/Console/        profiles:fetch|enqueue-due|repair, workload:run|check|crash|throughput|scheduler-memory
 fake-upstream/      stand-in for the Fans API endpoint, used by the workload
 resources/fixtures/ upstream response fixtures, incl. the real madison420ivy response
-tests/              94 PHPUnit tests
-docs/               scaling.md; evidence/ (test runs, workload reports, crash, throughput, memory)
+tests/              {{TESTS}} PHPUnit tests
+docs/               scaling.md; evidence/ (tests, workload, crash, throughput, memory, clean setup, live fetch)
 ```

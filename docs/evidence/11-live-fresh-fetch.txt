@@ -1,0 +1,17 @@
+# Live Fans API call, 2026-11-01T20:51Z: php artisan profiles:fetch madison420ivy
+# Fans API's cached snapshot was ~12 h old (cached_at 2026-11-01T08:12:09Z), older than FANSAPI_MAX_CACHE_AGE_MINUTES=60,
+# so the refresh recorded cache_too_old and asked again with ?fresh=true (1 credit). Earlier rows are a scheduled refresh
+# that ran on the previous code (it accepted the cached snapshot).
+
+$ psql: SELECT created_at, outcome, http_status, likes, revision, duration_ms FROM refresh_attempts
+     created_at      |    outcome    | http_status | likes  |   revision    | duration_ms 
+---------------------+---------------+-------------+--------+---------------+-------------
+ 2026-11-01 20:51:01 | success       |         200 | 611905 | 1793520729000 |         234
+ 2026-11-01 20:51:12 | cache_too_old |         200 | 611905 | 1793520729000 |         241
+ 2026-11-01 20:51:13 | success       |         200 | 611954 | 1793566272121 |        1492
+(3 rows)
+
+$ grep e1d15828-663c-4ada-992f-74885642ca36 storage/logs/refresh.log
+{"message":"refresh.queued","context":{"refresh_id":"e1d15828-663c-4ada-992f-74885642ca36","profile_id":1,"account_id":1,"source":"manual","handler":"v2"},"level":200,"level_name":"INFO","channel":"local","datetime":"2026-11-01T20:51:11.794116+00:00","extra":{}}
+{"message":"refresh.cache_too_old","context":{"refresh_id":"e1d15828-663c-4ada-992f-74885642ca36","account_id":1,"account":"fansapi","profile_id":1,"username":"madison420ivy","job_id":"","job_attempt":1,"upstream_attempt":1,"cached_at":"2026-11-01T08:12:09+00:00"},"level":200,"level_name":"INFO","channel":"local","datetime":"2026-11-01T20:51:12.121023+00:00","extra":{}}
+{"message":"refresh.success","context":{"refresh_id":"e1d15828-663c-4ada-992f-74885642ca36","account_id":1,"account":"fansapi","profile_id":1,"username":"madison420ivy","job_id":"","job_attempt":1,"upstream_attempt":2,"outcome":"success","http_status":200,"format":"fansapi","revision":1793566272121,"likes":611954,"duration_ms":1492,"memory_peak_mb":36.5},"level":200,"level_name":"INFO","channel":"local","datetime":"2026-11-01T20:51:13.618960+00:00","extra":{}}
