@@ -43,7 +43,7 @@ Windows 11 with Docker Desktop.
 | Command (in the project folder, on the host) | |
 |---|---|
 | `docker compose exec app php artisan profiles:fetch madison420ivy [--queue]` | fetch now in this process, or hand it to Horizon |
-| `docker compose exec app php artisan test` | 103 tests (Postgres and Redis of their own, never the real API) |
+| `docker compose exec app php artisan test` | 104 tests (Postgres and Redis of their own, never the real API) |
 | `docker compose exec -e REFRESH_HANDLER=legacy app php artisan test --group=incident` | the incident tests against the **old** handler: 6 of 7 fail |
 | `docker compose exec app php artisan workload:run --handler=legacy` / `--handler=v2` | the workload, before / after |
 | `docker compose exec app php artisan profiles:repair --since="2026-11-01 18:00"` | re-queue profiles written during the incident |
@@ -392,6 +392,6 @@ app/Jobs/           RefreshProfile (fixed), LegacyRefreshProfile (incident),
 app/Console/        profiles:fetch|enqueue-due|repair, workload:run|check|crash|throughput|scheduler-memory
 fake-upstream/      stand-in for the Fans API endpoint, used by the workload
 resources/fixtures/ upstream response fixtures, incl. the real madison420ivy response
-tests/              103 PHPUnit tests
+tests/              104 PHPUnit tests
 docs/               scaling.md; evidence/ (tests, workload, crash, throughput, memory, clean setup, live fetch)
 ```

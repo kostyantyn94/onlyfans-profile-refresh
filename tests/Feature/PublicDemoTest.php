@@ -36,6 +36,20 @@ class PublicDemoTest extends TestCase
         Queue::assertNothingPushed();
     }
 
+    public function test_pagination_links_use_the_public_https_url(): void
+    {
+        $account = $this->makeAccount();
+        \Illuminate\Support\Facades\DB::table('profiles')->insert(array_map(fn ($i) => [
+            'account_id' => $account->id, 'username' => "p-{$i}", 'created_at' => now(), 'updated_at' => now(),
+        ], range(1, 60)));
+
+        $page = $this->withHeaders(self::PROXIED)->get('/')->assertOk()->getContent();
+
+        $this->assertStringContainsString('href="https://demo.example.test:8443?page=2"', $page);
+        $this->assertStringNotContainsString('http://localhost', $page);
+        $this->withHeaders(self::PROXIED)->get('/?page=2')->assertOk()->assertSee('p-');
+    }
+
     public function test_requests_made_on_the_machine_itself_are_unaffected(): void
     {
         $this->get('/')->assertOk()->assertSee('Track a username')->assertDontSee('Public read-only demo');
