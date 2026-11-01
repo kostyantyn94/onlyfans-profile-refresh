@@ -47,8 +47,9 @@ class RefreshScheduler
     /**
      * Claim and queue every due profile, in batches so memory stays flat however
      * many profiles exist. FOR UPDATE SKIP LOCKED lets two schedulers run at
-     * once without claiming the same rows. Lost claims are taken over first, in
-     * a query of their own, so each query can walk its own partial index.
+     * once without claiming the same rows. Due profiles come first; lost claims
+     * are taken over in a query of their own (each walks its own partial index)
+     * and may use at most a tenth of the run, so they cannot crowd out due work.
      */
     public function enqueueDue(?CarbonImmutable $now = null, int $batch = 500, int $max = 50_000): int
     {
@@ -69,9 +70,11 @@ class RefreshScheduler
             LIMIT ? FOR UPDATE SKIP LOCKED
             SQL;
 
-        foreach ([[$lostClaims, $this->claimExpiry($now)], [$due, $now]] as [$select, $before]) {
-            while ($queued < $max) {
-                $limit = min($batch, $max - $queued);
+        foreach ([[$due, $now, $max], [$lostClaims, $this->claimExpiry($now), max(1, intdiv($max, 10))]] as [$select, $before, $cap]) {
+            $taken = 0;
+
+            while ($taken < $cap) {
+                $limit = min($batch, $cap - $taken);
 
                 $rows = DB::select(
                     "UPDATE profiles SET refresh_queued_at = ?, pending_refresh_id = gen_random_uuid()
@@ -85,6 +88,7 @@ class RefreshScheduler
                 }
 
                 $queued += count($rows);
+                $taken += count($rows);
 
                 if (count($rows) < $limit) {
                     break;

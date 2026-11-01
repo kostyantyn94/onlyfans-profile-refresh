@@ -11,6 +11,8 @@ enum Outcome: string
     case Unchanged = 'unchanged';
     // Valid response, older revision than stored (arrived late): ignored.
     case Stale = 'stale_ignored';
+    // Fans API answered from a cache older than allowed; asked again with ?fresh=true.
+    case CacheTooOld = 'cache_too_old';
 
     case RateLimited = 'rate_limited';
     case ServerError = 'server_error';
@@ -19,7 +21,7 @@ enum Outcome: string
     case NotFound = 'not_found';
     case AuthFailed = 'auth_failed';
     case ClientError = 'client_error';
-    // Retry window over, or the job kept throwing: the refresh is abandoned.
+    // The job kept throwing or crashing its worker: the refresh is abandoned.
     case GaveUp = 'gave_up';
 
     public static function fromHttpStatus(int $status): self

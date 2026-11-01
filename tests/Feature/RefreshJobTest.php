@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Profile;
 use App\Models\RefreshAttempt;
 use App\Refresh\AccountThrottle;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Queue\MaxAttemptsExceededException;
 use Illuminate\Support\Facades\Http;
@@ -93,21 +94,36 @@ class RefreshJobTest extends TestCase
         $this->assertEqualsWithDelta(now()->addMinutes(60)->timestamp, $profile->next_refresh_at->timestamp, 5);
     }
 
-    public function test_server_errors_give_up_after_three_attempts(): void
+    public function test_server_errors_give_up_after_four_attempts(): void
     {
         $profile = $this->profileWithValidData();
         $refreshId = (string) Str::uuid();
         Http::fake(['*' => Http::response('', 503)]);
 
-        $first = $this->runRefresh($profile, $refreshId);
-        $second = $this->runRefresh($profile, $refreshId);
-        $third = $this->runRefresh($profile, $refreshId);
+        $jobs = array_map(fn () => $this->runRefresh($profile, $refreshId), range(1, 4));
 
-        $this->assertTrue($first->job->isReleased());
-        $this->assertTrue($second->job->isReleased());
-        $this->assertFalse($third->job->isReleased());
-        $this->assertSame(3, $profile->refresh()->consecutive_failures);
-        $this->assertSame(['server_error', 'server_error', 'server_error'], RefreshAttempt::query()->orderBy('id')->pluck('outcome')->all());
+        $this->assertSame([true, true, true, false], array_map(fn ($job) => $job->job->isReleased(), $jobs));
+        $this->assertSame(array_fill(0, 4, 'server_error'), RefreshAttempt::query()->orderBy('id')->pluck('outcome')->all());
+        // One failed refresh, however many attempts it took: retried in an hour.
+        $this->assertSame(1, $profile->refresh()->consecutive_failures);
+        $this->assertEqualsWithDelta(now()->addHour()->timestamp, $profile->next_refresh_at->timestamp, 5);
+    }
+
+    public function test_a_refresh_that_runs_out_of_429_retries_is_one_failed_refresh(): void
+    {
+        $profile = $this->profileWithValidData(attributes: ['likes_count' => 611_905]);
+        $refreshId = (string) Str::uuid();
+        Http::fake(['*' => Http::response('', 429)]);
+
+        foreach (range(1, config('refresh.retry.rate_limited.max')) as $i) {
+            $this->runRefresh($profile, $refreshId);
+        }
+
+        $profile->refresh();
+        $this->assertSame(8, $profile->attempts()->count());
+        $this->assertSame(1, $profile->consecutive_failures, 'counted per refresh, not per attempt');
+        $this->assertEqualsWithDelta(now()->addHour()->timestamp, $profile->next_refresh_at->timestamp, 5, 'not 2^7 hours');
+        $this->assertNull($profile->pending_refresh_id);
     }
 
     public function test_a_timeout_is_retried_with_backoff(): void
@@ -230,7 +246,53 @@ class RefreshJobTest extends TestCase
         $this->assertTrue($profile->last_attempt_at->gt($profile->last_success_at));
         $this->assertEquals($profile->last_attempt_at, $profile->last_failure_at);
         $this->assertSame('HTTP 500 with an empty body', $profile->last_failure_reason);
-        $this->assertSame(1, $profile->consecutive_failures);
+        $this->assertSame(0, $profile->consecutive_failures, 'a retry is pending: not a failed refresh yet');
+    }
+
+    public function test_an_old_cached_fans_api_snapshot_is_fetched_again_fresh(): void
+    {
+        // The fixture was cached by Fans API at 2026-11-01 08:12:09 UTC.
+        $this->travelTo(CarbonImmutable::parse('2026-11-01 20:00:00 UTC'));
+        $profile = $this->profileWithValidData(attributes: ['likes_count' => null, 'revision' => null]);
+        $live = json_decode($this->fixture('fansapi-madison420ivy.json'), true);
+        $live['data']['favoritedCount'] = 612_000;
+        $live['_meta']['_cache'] = ['is_cached' => false, 'cached_at' => '2026-11-01T20:00:00+00:00'];
+        Http::fake(['*' => Http::sequence()
+            ->push($this->fixture('fansapi-madison420ivy.json'))
+            ->push($live)]);
+
+        $this->runRefresh($profile);
+
+        $recorded = Http::recorded();
+        $this->assertCount(2, $recorded);
+        $this->assertStringNotContainsString('fresh=true', $recorded[0][0]->url(), 'the cache is tried first: it is free');
+        $this->assertStringContainsString('fresh=true', $recorded[1][0]->url());
+        $this->assertSame(612_000, $profile->refresh()->likes_count);
+        $this->assertSame(['cache_too_old', 'success'], RefreshAttempt::query()->orderBy('id')->pluck('outcome')->all());
+    }
+
+    public function test_a_recent_cached_snapshot_is_used_as_is(): void
+    {
+        $this->travelTo(CarbonImmutable::parse('2026-11-01 08:30:00 UTC'));
+        $profile = $this->profileWithValidData(attributes: ['likes_count' => null, 'revision' => null]);
+        Http::fake(['*' => Http::response($this->fixture('fansapi-madison420ivy.json'))]);
+
+        $this->runRefresh($profile);
+
+        Http::assertSentCount(1);
+        $this->assertSame(611_905, $profile->refresh()->likes_count);
+    }
+
+    public function test_the_same_revision_with_different_likes_corrects_the_stored_row(): void
+    {
+        // What the old handler left: 0 stored with the upstream's real revision.
+        $profile = $this->profileWithValidData(attributes: ['likes_count' => 0, 'revision' => 11]);
+        Http::fake(['*' => Http::response($this->fixture('new-format.json'))]);
+
+        $this->runRefresh($profile);
+
+        $this->assertSame(121_000, $profile->refresh()->likes_count);
+        $this->assertSame('success', $profile->last_attempt_status);
     }
 
     public function test_a_replayed_old_job_does_not_release_a_newer_claim(): void

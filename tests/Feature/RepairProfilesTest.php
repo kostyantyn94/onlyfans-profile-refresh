@@ -10,16 +10,13 @@ use Tests\TestCase;
 
 class RepairProfilesTest extends TestCase
 {
-    public function test_a_plain_refetch_would_not_fix_data_the_old_handler_corrupted(): void
+    public function test_without_repair_a_profile_the_old_handler_broke_waits_for_its_next_scheduled_refresh(): void
     {
-        // What the old handler left behind: the new format read as 0, stored with the real revision.
-        $profile = $this->profileWithValidData(attributes: ['likes_count' => 0, 'revision' => 11, 'last_success_at' => now()->subMinutes(10)]);
-        Http::fake(['*' => Http::response($this->fixture('new-format.json'))]);
+        Queue::fake();
+        // The old handler stored 0, called it a success and scheduled the next refresh a day out.
+        $this->profileWithValidData(attributes: ['likes_count' => 0, 'revision' => 11, 'last_success_at' => now()->subMinutes(10), 'next_refresh_at' => now()->addDay()]);
 
-        $this->runRefresh($profile);
-
-        $this->assertSame(0, $profile->refresh()->likes_count, 'same revision: the guard keeps the zero');
-        $this->assertSame('unchanged', $profile->last_attempt_status);
+        $this->assertSame(0, app(\App\Refresh\RefreshScheduler::class)->enqueueDue(), 'not due: the zero would stay visible for a day');
     }
 
     public function test_repair_clears_the_revision_and_requeues_profiles_written_during_the_incident(): void

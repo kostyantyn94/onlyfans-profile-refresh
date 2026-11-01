@@ -82,7 +82,9 @@ class RefreshSchedulingTest extends TestCase
         Queue::assertPushed(LegacyRefreshProfile::class);
     }
 
-    public function test_one_profile_per_account_and_username_however_many_creators_race(): void
+    // Sequential, not a real race: createOrFirst returns the existing row, and the
+    // unique index is what stops a concurrent second insert.
+    public function test_one_profile_per_account_and_username(): void
     {
         $account = $this->makeAccount();
 

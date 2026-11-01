@@ -32,8 +32,9 @@ return [
     // jitter") so retries from many jobs do not arrive together.
     'retry' => [
         'rate_limited' => ['max' => 8, 'base_seconds' => (float) env('REFRESH_RATE_LIMIT_BASE', 2), 'cap_seconds' => 60],
-        'server_error' => ['max' => 3, 'base_seconds' => (float) env('REFRESH_RETRY_BASE', 2), 'cap_seconds' => 60],
-        'timeout' => ['max' => 3, 'base_seconds' => (float) env('REFRESH_RETRY_BASE', 2), 'cap_seconds' => 60],
+        // 4 tries, 5 s base: a refresh rides out about half a minute of 5xx.
+        'server_error' => ['max' => 4, 'base_seconds' => (float) env('REFRESH_RETRY_BASE', 5), 'cap_seconds' => 60],
+        'timeout' => ['max' => 4, 'base_seconds' => (float) env('REFRESH_RETRY_BASE', 5), 'cap_seconds' => 60],
     ],
     'max_upstream_attempts' => 10,
 
@@ -47,9 +48,11 @@ return [
     'failed_retry_after_minutes' => 60,
 
     // A claim (refresh_queued_at) older than this is treated as lost, e.g. the
-    // dispatch never reached Redis. Longer than a refresh's retries can take
-    // (at most 10 attempts, each delay capped at 60 s).
-    'claim_expires_after_minutes' => 30,
+    // dispatch never reached Redis, and the profile is queued again. Far longer
+    // than a refresh's retries can take (10 attempts, Retry-After capped at
+    // 5 min). A queue that waits longer than this does get a second job, but the
+    // first one then finds it no longer holds the claim and stops at once.
+    'claim_expires_after_minutes' => 360,
 
     // Base URL of the local fake upstream used by workload:run.
     'fake_upstream_url' => env('FAKE_UPSTREAM_URL', 'http://fake-upstream:8080'),

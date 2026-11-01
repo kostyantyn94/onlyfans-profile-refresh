@@ -3,9 +3,11 @@
 namespace App\Jobs;
 
 use App\Jobs\Middleware\AccountGate;
+use App\Jobs\Middleware\SkipUnclaimedRefresh;
 use App\Refresh\ProfileRefresher;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Queue\Attributes\CountCrashesAsExceptions;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Throwable;
 
@@ -16,7 +18,11 @@ use Throwable;
  * and no fixed number of tries: both would also count time spent waiting in
  * the queue or deferred by the account gate, and fail refreshes that never
  * reached the upstream exactly when the queue is backed up.
+ *
+ * A worker that dies on this job (OOM, fatal error) counts towards
+ * $maxExceptions too, so a job that kills workers cannot loop forever.
  */
+#[CountCrashesAsExceptions]
 class RefreshProfile implements ShouldQueue
 {
     use Queueable;
@@ -44,6 +50,7 @@ class RefreshProfile implements ShouldQueue
     public function middleware(): array
     {
         return [
+            new SkipUnclaimedRefresh,
             new AccountGate($this->accountId),
             // Two deliveries for the same profile never run side by side
             // (e.g. a duplicate dispatch, or a redelivery after retry_after).

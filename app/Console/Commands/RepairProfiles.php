@@ -11,12 +11,12 @@ use Illuminate\Console\Command;
 /**
  * Repairs profiles written by the broken handler during the incident.
  *
- * Re-fetching alone is not enough: the old handler stored likes 0 together
- * with the upstream's real revision (11), so a fresh response at revision 11
- * would count as "unchanged" and the zero would stay. Every profile marked
- * successful since the incident started is suspect, so its revision is
- * cleared and a refresh is queued; the fixed handler then writes whatever the
- * upstream returns, after validation.
+ * The old handler marked every response a success and scheduled the next
+ * refresh 24-72 h later, so the profiles it broke would keep showing 0 until
+ * then. Every profile marked successful since the incident started is suspect:
+ * its revision is cleared (so whatever it stored at the upstream's real revision
+ * is rewritten, not just likes) and a refresh is queued now. The fixed handler
+ * then writes whatever the upstream returns, after validation.
  */
 class RepairProfiles extends Command
 {

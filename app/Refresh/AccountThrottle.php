@@ -31,7 +31,9 @@ class AccountThrottle
 
     public function funnelKey(int $accountId): string
     {
-        return 'refresh:funnel:account:'.$accountId;
+        // Laravel appends the slot number; the trailing ':' keeps account 1's
+        // slot 11 from being account 11's slot 1.
+        return 'refresh:funnel:account:'.$accountId.':slot';
     }
 
     private function cooldownKey(int $accountId): string

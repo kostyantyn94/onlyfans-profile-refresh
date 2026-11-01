@@ -65,6 +65,45 @@ class RealWorkerTest extends TestCase
         $this->assertNotNull($profile->refresh()->pending_refresh_id, 'still claimed: the refresh is waiting, not dropped');
     }
 
+    public function test_a_job_that_keeps_throwing_gives_up_after_max_exceptions(): void
+    {
+        $profile = $this->profileWithValidData();
+        // Not an upstream failure (those are handled): a bug or a database outage.
+        Http::fake(fn () => throw new \RuntimeException('unexpected'));
+
+        app(RefreshScheduler::class)->enqueue($profile);
+        $this->work();
+        $this->work();
+        $this->work();
+
+        $profile->refresh();
+        $this->assertSame('gave_up', $profile->last_attempt_status);
+        $this->assertNull($profile->pending_refresh_id, 'the claim is given back');
+        $this->assertSame(120_000, $profile->likes_count);
+        $this->assertSame(1, \Illuminate\Support\Facades\DB::table('failed_jobs')->count());
+    }
+
+    public function test_a_queued_job_replaced_after_its_claim_expired_stops_without_calling_the_upstream(): void
+    {
+        $profile = $this->profileWithValidData();
+        Http::fake(['*' => Http::response($this->fixture('new-format.json'))]);
+
+        $old = app(RefreshScheduler::class)->enqueue($profile);
+        // The queue was so backed up that the claim expired and the scheduler queued a new refresh.
+        \App\Models\Profile::query()->whereKey($profile->id)->update(['refresh_queued_at' => now()->subMinutes(config('refresh.claim_expires_after_minutes') + 1)]);
+        $this->assertSame(1, app(RefreshScheduler::class)->enqueueDue());
+        $new = $profile->refresh()->pending_refresh_id;
+
+        $this->work();
+        Http::assertNothingSent();
+
+        $this->work();
+        Http::assertSentCount(1);
+        $this->assertNotSame($old, $new);
+        $this->assertSame([$new], RefreshAttempt::query()->pluck('refresh_id')->all());
+        $this->assertSame(121_000, $profile->refresh()->likes_count);
+    }
+
     private function work(): void
     {
         $this->artisan('queue:work', ['connection' => 'redis', '--queue' => 'refresh', '--once' => true, '--sleep' => 0])

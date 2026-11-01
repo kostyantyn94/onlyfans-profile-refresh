@@ -18,7 +18,7 @@ class FansApiClient
      *
      * @throws ConnectionException on connect/read timeouts and network errors
      */
-    public function fetchProfile(Account $account, string $username): UpstreamResponse
+    public function fetchProfile(Account $account, string $username, bool $fresh = false): UpstreamResponse
     {
         $sentAtMs = (int) floor(microtime(true) * 1000);
         $started = hrtime(true);
@@ -29,7 +29,7 @@ class FansApiClient
             ->withUserAgent('profile-refresher/1.0')
             ->connectTimeout((int) config('refresh.http.connect_timeout'))
             ->timeout((int) config('refresh.http.timeout'))
-            ->get('api/profiles/'.rawurlencode($username), config('services.fansapi.fresh') ? ['fresh' => 'true'] : []);
+            ->get('api/profiles/'.rawurlencode($username), $fresh || config('services.fansapi.fresh') ? ['fresh' => 'true'] : []);
 
         return new UpstreamResponse(
             status: $response->status(),

@@ -8,6 +8,7 @@ use App\Models\RefreshAttempt;
 use App\Upstream\FansApiClient;
 use App\Upstream\InvalidProfilePayload;
 use App\Upstream\ProfilePayloadParser;
+use App\Upstream\ProfileSnapshot;
 use App\Upstream\UpstreamResponse;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\ConnectionException;
@@ -50,27 +51,28 @@ class ProfileRefresher
         $attempt = RefreshAttempt::query()->where('refresh_id', $job->refreshId)->count() + 1;
         $context = $this->context($job, $profile, $attempt);
 
-        try {
-            $response = $this->client->fetchProfile($profile->account, $profile->username);
-        } catch (ConnectionException $e) {
-            $this->failed($job, $profile, $attempt, Outcome::Timeout, $this->clean($e->getMessage()), null, $context);
+        $result = $this->fetchValid($job, $profile, $attempt, $context, fresh: false);
 
+        if ($result === null) {
             return;
         }
 
-        if ($response->status < 200 || $response->status >= 300) {
-            $reason = "HTTP {$response->status}".($response->body === '' ? ' with an empty body' : '');
-            $this->failed($job, $profile, $attempt, Outcome::fromHttpStatus($response->status), $reason, $response, $context);
+        [$response, $snapshot] = $result;
 
-            return;
-        }
+        if ($this->cacheTooOld($snapshot)) {
+            // Fans API answered from a cached snapshot older than we accept: that
+            // is not a refresh. Record it and ask once more for live data.
+            $this->recordAttempt($job, $profile, $attempt, Outcome::CacheTooOld, $response, revision: $snapshot->revision, likes: $snapshot->likes);
+            Log::channel('refresh')->info('refresh.cache_too_old', [...$context, 'cached_at' => $snapshot->cachedAt->toIso8601String()]);
 
-        try {
-            $snapshot = $this->parser->parse($response->body, $response->sentAtMs);
-        } catch (InvalidProfilePayload $e) {
-            $this->failed($job, $profile, $attempt, Outcome::InvalidResponse, 'invalid response: '.$e->getMessage(), $response, $context);
+            $context['upstream_attempt'] = ++$attempt;
+            $result = $this->fetchValid($job, $profile, $attempt, $context, fresh: true);
 
-            return;
+            if ($result === null) {
+                return;
+            }
+
+            [$response, $snapshot] = $result;
         }
 
         $this->crashForTest($job, 'before-write', $context);
@@ -93,7 +95,46 @@ class ProfileRefresher
         $this->crashForTest($job, 'after-write', $context);
     }
 
-    /** The job is out of time or kept throwing: finish the refresh as failed. */
+    /**
+     * One upstream call that ends in a validated snapshot, or null after the
+     * failure has been recorded (and the job released or finished).
+     *
+     * @return array{0: UpstreamResponse, 1: ProfileSnapshot}|null
+     */
+    private function fetchValid(RefreshProfile $job, Profile $profile, int $attempt, array $context, bool $fresh): ?array
+    {
+        try {
+            $response = $this->client->fetchProfile($profile->account, $profile->username, $fresh);
+        } catch (ConnectionException $e) {
+            $this->failed($job, $profile, $attempt, Outcome::Timeout, $this->clean($e->getMessage()), null, $context);
+
+            return null;
+        }
+
+        if ($response->status < 200 || $response->status >= 300) {
+            $reason = "HTTP {$response->status}".($response->body === '' ? ' with an empty body' : '');
+            $this->failed($job, $profile, $attempt, Outcome::fromHttpStatus($response->status), $reason, $response, $context);
+
+            return null;
+        }
+
+        try {
+            return [$response, $this->parser->parse($response->body, $response->sentAtMs)];
+        } catch (InvalidProfilePayload $e) {
+            $this->failed($job, $profile, $attempt, Outcome::InvalidResponse, 'invalid response: '.$e->getMessage(), $response, $context);
+
+            return null;
+        }
+    }
+
+    private function cacheTooOld(ProfileSnapshot $snapshot): bool
+    {
+        return $snapshot->cachedAt !== null
+            && ! config('services.fansapi.fresh')
+            && $snapshot->cachedAt->lt(CarbonImmutable::now()->subMinutes((int) config('services.fansapi.max_cache_age_minutes')));
+    }
+
+    /** The job kept throwing or crashing its worker: finish the refresh as failed. */
     public function giveUp(RefreshProfile $job, ?Throwable $e): void
     {
         $profile = Profile::query()->find($job->profileId);

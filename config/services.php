@@ -40,6 +40,9 @@ return [
         'key' => env('FANSAPI_KEY'),
         // ?fresh=true costs 1 credit per request; cached answers are free.
         'fresh' => (bool) env('FANSAPI_FRESH', false),
+        // A cached snapshot older than this is not a refresh: ask again with
+        // ?fresh=true (1 credit).
+        'max_cache_age_minutes' => (int) env('FANSAPI_MAX_CACHE_AGE_MINUTES', 60),
     ],
 
 ];

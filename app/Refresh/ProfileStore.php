@@ -21,10 +21,16 @@ class ProfileStore
     {
         return DB::transaction(function () use ($profile, $snapshot, $refreshId, $now) {
             // One conditional UPDATE: of two racing responses, only a newer
-            // revision can win, whatever order the workers commit in.
+            // revision can win, whatever order the workers commit in. The same
+            // revision with different likes also writes: the upstream says this
+            // version has other data, so the stored row is the one that is wrong
+            // (e.g. a 0 written by the old handler) and is corrected.
             $applied = Profile::query()
                 ->whereKey($profile->id)
-                ->where(fn ($query) => $query->whereNull('revision')->orWhere('revision', '<', $snapshot->revision))
+                ->where(fn ($query) => $query->whereNull('revision')
+                    ->orWhere('revision', '<', $snapshot->revision)
+                    ->orWhere(fn ($same) => $same->where('revision', $snapshot->revision)
+                        ->where(fn ($likes) => $likes->whereNull('likes_count')->orWhere('likes_count', '!=', $snapshot->likes))))
                 ->update([
                     ...$snapshot->attributes,
                     'likes_count' => $snapshot->likes,
@@ -61,7 +67,8 @@ class ProfileStore
 
     /**
      * A failed attempt. The last valid data and last_success_at stay as they are.
-     * A final failure also gives the claim back and schedules a later retry.
+     * A final failure also counts as one more failed refresh, gives the claim
+     * back and schedules a later retry.
      */
     public function recordFailure(Profile $profile, Outcome $outcome, string $reason, string $refreshId, bool $final, CarbonImmutable $now): void
     {
@@ -71,17 +78,17 @@ class ProfileStore
                 'last_attempt_status' => $outcome->value,
                 'last_failure_at' => $now,
                 'last_failure_reason' => Str::limit($reason, 480),
-                'consecutive_failures' => DB::raw('consecutive_failures + 1'),
                 'updated_at' => $now,
             ]);
 
             if ($final) {
-                $failures = (int) Profile::query()->whereKey($profile->id)->value('consecutive_failures');
+                $failures = (int) Profile::query()->whereKey($profile->id)->value('consecutive_failures') + 1;
 
                 Profile::query()
                     ->whereKey($profile->id)
                     ->where('pending_refresh_id', $refreshId)
                     ->update([
+                        'consecutive_failures' => $failures,
                         'refresh_queued_at' => null,
                         'pending_refresh_id' => null,
                         'next_refresh_at' => $now->addMinutes($this->failureBackoffMinutes($failures)),
@@ -99,7 +106,7 @@ class ProfileStore
             ->update(['refresh_queued_at' => null, 'pending_refresh_id' => null]);
     }
 
-    /** 60 min after the first failed refresh, doubling per consecutive failure, at most 72 h. */
+    /** 60 min after the first failed refresh, doubling per consecutive failed refresh, at most 72 h. */
     private function failureBackoffMinutes(int $consecutiveFailures): int
     {
         $base = (int) config('refresh.failed_retry_after_minutes');

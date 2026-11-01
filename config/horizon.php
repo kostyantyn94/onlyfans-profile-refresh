@@ -211,8 +211,8 @@ return [
             'maxTime' => 3600,
             'maxJobs' => 1000,
             'memory' => 64,
-            // 0 = no fixed count: refresh jobs bound themselves with retryUntil()
-            // and per-outcome retry budgets (config/refresh.php).
+            // 0 = no fixed count: refresh jobs are bounded by per-outcome retry
+            // budgets (config/refresh.php) and $maxExceptions.
             'tries' => 0,
             'timeout' => 45,
             'sleep' => 1,

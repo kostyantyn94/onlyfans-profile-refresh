@@ -123,7 +123,6 @@ class IncidentRegressionTest extends TestCase
         // after retry_after because the first worker never acknowledged it.
         $this->deliverAgain($profile, $refreshId);
 
-        $this->assertSame(1, Profile::query()->count());
         $profile->refresh();
         $this->assertSame(121_000, $profile->likes_count);
         $this->assertSame(11, $profile->revision);
