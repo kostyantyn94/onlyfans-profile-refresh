@@ -3,6 +3,7 @@
 namespace App\Refresh;
 
 use App\Jobs\LegacyRefreshProfile;
+use App\Jobs\RefreshProfile;
 use App\Models\Profile;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
@@ -84,9 +85,11 @@ class RefreshScheduler
         return $queued;
     }
 
-    public function makeJob(int $profileId, int $accountId, string $refreshId): LegacyRefreshProfile
+    public function makeJob(int $profileId, int $accountId, string $refreshId): RefreshProfile|LegacyRefreshProfile
     {
-        return new LegacyRefreshProfile($profileId, $accountId, $refreshId);
+        return config('refresh.handler') === 'legacy'
+            ? new LegacyRefreshProfile($profileId, $accountId, $refreshId)
+            : new RefreshProfile($profileId, $accountId, $refreshId);
     }
 
     private function dispatch(int $profileId, int $accountId, string $refreshId, string $source): void
