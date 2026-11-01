@@ -1,0 +1,15 @@
+Refresh 71522838-f952-4981-8352-24758c16e8c6 queued; the worker that picks it up will be killed after-write.
+Worker killed after 0.8 s. Profile now: likes=121000 revision=11, claim released, attempts recorded: 1, jobs reserved in Redis: 1.
+Waiting for Redis to hand the job out again (retry_after = 90 s)...
++---------------------------------+------------------------------+
+| check                           | result                       |
++---------------------------------+------------------------------+
+| redelivered                     | yes, 91 s after queueing     |
+| profile rows for crash-001      | 1                            |
+| final likes / revision          | 121000 / 11                  |
+| attempts (outcome, job attempt) | success (#1), unchanged (#2) |
+| upstream requests               | 2                            |
+| claim                           | released                     |
+| last_attempt_status             | unchanged                    |
+| failed jobs                     | 0                            |
++---------------------------------+------------------------------+

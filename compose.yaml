@@ -27,7 +27,7 @@ services:
       <<: *php-env
       PHP_CLI_SERVER_WORKERS: 8
     ports:
-      - "8000:8000"
+      - "${APP_PORT:-8000}:8000"
 
   horizon:
     <<: *php

@@ -1,0 +1,11 @@
+$ php artisan profiles:repair --since="2026-11-01 19:45:38"
+50 profile(s) marked successful since 2026-11-01 19:45:38 UTC.
+Revision cleared and refresh queued for 50 profile(s); 0 already had a refresh pending.
+
+$ php artisan workload:check
++---------+----------+----------------------------+------------------------------------+-------+---------------+
+| account | profiles | correct (121,000 / rev 11) | kept last valid (120,000 / rev 10) | wrong | still pending |
++---------+----------+----------------------------+------------------------------------+-------+---------------+
+| busy    | 40       | 40                         | 0                                  | 0     | 0             |
+| calm    | 10       | 10                         | 0                                  | 0     | 0             |
++---------+----------+----------------------------+------------------------------------+-------+---------------+
