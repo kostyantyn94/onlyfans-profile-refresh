@@ -12,7 +12,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // First in the web group (before CSRF), and Horizon's routes use the web
+        // group too, so this also covers /horizon.
+        $middleware->web(prepend: [App\Http\Middleware\PublicDemo::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

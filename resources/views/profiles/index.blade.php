@@ -58,6 +58,7 @@
             @endif
         </form>
 
+        @unless ($readOnly ?? false)
         <form class="tool" method="post" action="{{ route('profiles.store') }}">
             @csrf
             <label class="tool__label" for="username">Track a username</label>
@@ -74,6 +75,7 @@
                 <p class="tool__hint">Adds the OnlyFans username to the Fans API account and queues its first refresh now.</p>
             @enderror
         </form>
+        @endunless
     </section>
 
     @php($pendingHere = $profiles->contains(fn ($profile) => $profile->isRefreshPending()))

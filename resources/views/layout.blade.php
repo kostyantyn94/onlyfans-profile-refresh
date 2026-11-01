@@ -27,11 +27,16 @@
         </a>
         <nav class="topnav" aria-label="Main">
             <a href="{{ route('profiles.index') }}" @if (request()->routeIs('profiles.*')) aria-current="page" @endif>Profiles</a>
+            @unless ($readOnly ?? false)
             <a href="/horizon">Horizon <x-icon name="external" :size="13" /></a>
+            @endunless
         </nav>
     </div>
 </header>
 <main id="main" class="container">
+    @if ($readOnly ?? false)
+        <div class="flash" role="note"><x-icon name="info" /><span>Public read-only demo: tracking, "refresh now" and the Horizon dashboard are switched off here. The data is live and refreshed by the workers.</span></div>
+    @endif
     @if (session('status'))
         <div class="flash" role="status"><x-icon name="check-circle" /><span>{{ session('status') }}</span></div>
     @endif

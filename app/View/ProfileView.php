@@ -153,7 +153,7 @@ final class ProfileView
         if ($profile->last_attempt_at === null) {
             return [
                 'tone' => 'neutral', 'icon' => 'info', 'title' => 'Never refreshed',
-                'text' => 'No upstream attempt yet. The scheduler queues it within a minute, or use Refresh now.',
+                'text' => 'No upstream attempt yet. The scheduler queues it within a minute.',
             ];
         }
 

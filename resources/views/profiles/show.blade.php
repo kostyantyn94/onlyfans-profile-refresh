@@ -48,12 +48,14 @@
             </div>
             <div class="hero__actions" data-live="actions">
                 @if ($pending)<x-live />@endif
+                @unless ($readOnly ?? false)
                 <form method="post" action="{{ route('profiles.refresh', $profile) }}">
                     @csrf
                     <button class="btn btn--primary" type="submit" @disabled($pending) @if ($pending) title="A refresh is already pending for this profile" @endif>
                         <x-icon name="refresh" :size="15" /> {{ $pending ? 'Refresh pending' : 'Refresh now' }}
                     </button>
                 </form>
+                @endunless
             </div>
         </div>
     </section>
@@ -182,7 +184,7 @@
                             <span class="milestone__sub">taken over by the scheduler if still held <x-ago :at="$profile->refresh_queued_at->copy()->addMinutes(config('refresh.claim_expires_after_minutes'))" /></span>
                         @else
                             <span class="milestone__main">None</span>
-                            <span class="milestone__sub">No refresh is queued or running; Refresh now can claim one.</span>
+                            <span class="milestone__sub">No refresh is queued or running{{ ($readOnly ?? false) ? '.' : '; Refresh now can claim one.' }}</span>
                         @endif
                     </dd>
                 </div>
