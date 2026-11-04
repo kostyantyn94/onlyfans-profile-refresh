@@ -75,6 +75,26 @@ class SigningRulesProviderTest extends TestCase
         $this->assertSame('67890', $this->provider->for(self::BASE)->prefix);
     }
 
+    public function test_a_rejection_reloads_the_rules_once_not_once_per_request_in_flight(): void
+    {
+        config(['services.onlyfans.rules_reject_limit' => 3]);
+        config(['services.onlyfans.rules_sources' => ['upstream.test' => ['https://rules.test/rules.json']]]);
+        Http::fake(['rules.test/*' => Http::response($this->fixture('onlyfans-test-rules.json'))]);
+        $rules = $this->provider->for(self::BASE);
+        $sentBeforeReload = now()->getTimestampMs();
+
+        // The first rejection reloads the rules (here: the same ones again).
+        $this->travel(2)->seconds();
+        $this->provider->reject(self::BASE, $rules, str_repeat('a', 40), null, $sentBeforeReload);
+        $this->provider->for(self::BASE);
+        Http::assertSentCount(2);
+
+        // Another request sent before that reload is rejected late: no second reload.
+        $this->provider->reject(self::BASE, $rules, str_repeat('b', 40), null, $sentBeforeReload);
+        $this->provider->for(self::BASE);
+        Http::assertSentCount(2);
+    }
+
     public function test_the_rejection_window_does_not_slide(): void
     {
         config(['services.onlyfans.rules_reject_limit' => 3]);

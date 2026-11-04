@@ -42,10 +42,6 @@ class SigningRulesProvider
     // Rules accepted by OnlyFans this recently are not blamed for a rejection.
     private const PROVEN_FOR = 600;
 
-    // A rejection reloads rules loaded longer ago than this (a new release: always),
-    // so a burst of rejections from one bad session costs one reload, not one each.
-    private const RELOAD_AFTER_REJECTION = 5;
-
     public function __construct(private WebAppRulesSource $webApp) {}
 
     /** @throws SigningRulesUnavailable */
@@ -130,8 +126,11 @@ class SigningRulesProvider
      *
      * @param  string  $sessionToken  the session's x-bc, stored only as a hash
      * @param  ?string  $webAppRevision  OnlyFans' x-of-rev header: its current web app release
+     * @param  ?int  $sentAtMs  when the rejected request was sent: rules loaded after that
+     *                          are not reloaded again for it, so a burst of rejections
+     *                          of requests already in flight costs one reload, not one each
      */
-    public function reject(string $baseUrl, SigningRules $rules, string $sessionToken, ?string $webAppRevision = null): void
+    public function reject(string $baseUrl, SigningRules $rules, string $sessionToken, ?string $webAppRevision = null, ?int $sentAtMs = null): void
     {
         $host = $this->host($baseUrl);
         $key = $this->rejectionsKey($host, $rules);
@@ -156,7 +155,7 @@ class SigningRulesProvider
             if ($skipped) {
                 // No longer a last good copy to fall back on.
                 Cache::forget($this->cacheKey($host));
-            } elseif ($newRelease || (int) $cached['loaded_at'] < now()->timestamp - self::RELOAD_AFTER_REJECTION) {
+            } elseif ($newRelease || $sentAtMs === null || (int) $cached['loaded_at'] <= intdiv($sentAtMs, 1000)) {
                 $this->markForReload($host, $rules);
             }
         }

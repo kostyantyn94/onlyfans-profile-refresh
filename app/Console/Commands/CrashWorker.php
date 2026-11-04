@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\Account;
 use App\Models\Profile;
 use App\Models\RefreshAttempt;
+use App\Refresh\Outcome;
 use App\Refresh\RefreshScheduler;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -81,12 +82,13 @@ class CrashWorker extends Command
 
         $this->line("Waiting for Redis to hand the job out again (retry_after = {$retryAfter} s)...");
         // After the write, the redelivered job finds its refresh finished and skips
-        // (a log line, no upstream call); before the write, it does the work.
+        // (a log line, no upstream call); before the write, it does the work: an
+        // attempt with a result appears next to the killed one, left in_flight.
         $log = storage_path('logs/refresh.log');
         $offset = is_file($log) ? filesize($log) : 0;
         $redelivered = $this->waitFor(fn () => $point === 'after-write'
             ? str_contains((string) file_get_contents($log, offset: $offset), '"refresh.skipped_not_pending","context":{"refresh_id":"'.$refreshId)
-            : RefreshAttempt::query()->where('refresh_id', $refreshId)->count() >= 1, (int) $this->option('wait'));
+            : RefreshAttempt::query()->where('refresh_id', $refreshId)->where('outcome', '!=', Outcome::InFlight->value)->exists(), (int) $this->option('wait'));
 
         $final = $profile->fresh();
         $attempts = RefreshAttempt::query()->where('refresh_id', $refreshId)->orderBy('id')->get();

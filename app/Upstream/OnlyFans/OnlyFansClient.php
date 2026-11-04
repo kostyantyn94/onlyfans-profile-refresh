@@ -74,7 +74,7 @@ class OnlyFansClient implements ProfileClient
         $revision = $response->header('x-of-rev') ?: null;
 
         if ($rejected) {
-            $this->afterResponse(fn () => $this->rules->reject($account->base_url, $rules, $session->xBc, $revision));
+            $this->afterResponse(fn () => $this->rules->reject($account->base_url, $rules, $session->xBc, $revision, $sentAtMs));
         } elseif ($response->successful() || $response->status() === 404) {
             // The signature passed: "User not found" is an answer too.
             $this->afterResponse(fn () => $this->rules->accepted($account->base_url, $rules, $revision));
