@@ -1,5 +1,5 @@
 # Signing rules read from OnlyFans' web app code, live.
-# Commit: dd80622 Docs and evidence for the final code   Run: 2026-11-04T03:34Z
+# Commit: 2fd1c6c Evidence re-recorded at the final code (3665d45); numbers in the docs from that run   Run: 2026-11-04T04:02Z
 
 $ php artisan onlyfans:rules --reload     # reads the page, app.js and the signing script
 +---------------------+---------------------------------------------------------------------------------------------------------+
@@ -22,9 +22,9 @@ $ php artisan onlyfans:rules --reload     # same release: only the page is read 
 | rules (fingerprint) | 54d826cfd48b                                                                                            |
 
 # storage/logs/refresh.log during this run:
-{"message":"onlyfans.webapp_rules_read","context":{"release":"202611031453-fbc506331f","signing_script":"2313.js","signing_module":"802313","ms":597},"level":200,"level_name":"INFO","channel":"local","datetime":"2026-11-04T03:34:32.592066+00:00","extra":{}}
-{"message":"onlyfans.rules_loaded","context":{"host":"onlyfans.com","rules_source":"webapp:https://onlyfans.com/","rules":"54d826cfd48b","release":"202611031453-fbc506331f","passed_over":[]},"level":200,"level_name":"INFO","channel":"local","datetime":"2026-11-04T03:34:32.594946+00:00","extra":{}}
-{"message":"onlyfans.rules_loaded","context":{"host":"onlyfans.com","rules_source":"webapp:https://onlyfans.com/","rules":"54d826cfd48b","release":"202611031453-fbc506331f","passed_over":[]},"level":200,"level_name":"INFO","channel":"local","datetime":"2026-11-04T03:34:34.108953+00:00","extra":{}}
+{"message":"onlyfans.webapp_rules_read","context":{"release":"202611031453-fbc506331f","signing_script":"2313.js","signing_module":"802313","ms":629},"level":200,"level_name":"INFO","channel":"local","datetime":"2026-11-04T04:02:37.849982+00:00","extra":{}}
+{"message":"onlyfans.rules_loaded","context":{"host":"onlyfans.com","rules_source":"webapp:https://onlyfans.com/","rules":"54d826cfd48b","release":"202611031453-fbc506331f","passed_over":[],"rejected_recently":false},"level":200,"level_name":"INFO","channel":"local","datetime":"2026-11-04T04:02:37.852372+00:00","extra":{}}
+{"message":"onlyfans.rules_loaded","context":{"host":"onlyfans.com","rules_source":"webapp:https://onlyfans.com/","rules":"54d826cfd48b","release":"202611031453-fbc506331f","passed_over":[],"rejected_recently":false},"level":200,"level_name":"INFO","channel":"local","datetime":"2026-11-04T04:02:38.857770+00:00","extra":{}}
 
 # The public rule feeds right now (not used by default; opt-in via ONLYFANS_RULES_SOURCES), for comparison:
 https://raw.githubusercontent.com/rafa-9/dynamic-rules/main/rules.json
