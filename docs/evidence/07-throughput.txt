@@ -1,4 +1,4 @@
-Queued 3000 refreshes in 4.32 s (scheduler memory grew by 0.0 MB). Processing...
+Queued 3000 refreshes in 3.35 s (scheduler memory grew by 0.0 MB). Processing...
 +-------------------------------+-----------------------------------------+
 | metric                        | value                                   |
 +-------------------------------+-----------------------------------------+
@@ -6,10 +6,10 @@ Queued 3000 refreshes in 4.32 s (scheduler memory grew by 0.0 MB). Processing...
 | unfinished at the end         | 0                                       |
 | Horizon refresh workers       | 4                                       |
 | upstream latency added        | 50 ms                                   |
-| scheduler: claim + dispatch   | 4.32 s for 3000 (694/s), memory +0.0 MB |
-| wall time until all refreshed | 54.9 s                                  |
-| throughput                    | 55 refreshes/s (13.7 per worker)        |
-| upstream call p50 / p95       | 54 / 62 ms                              |
+| scheduler: claim + dispatch   | 3.35 s for 3000 (896/s), memory +0.0 MB |
+| wall time until all refreshed | 61.0 s                                  |
+| throughput                    | 49 refreshes/s (12.3 per worker)        |
+| upstream call p50 / p95       | 57 / 112 ms                             |
 | worker peak memory (max seen) | 36.5 MB                                 |
 | upstream requests             | 3000                                    |
 +-------------------------------+-----------------------------------------+

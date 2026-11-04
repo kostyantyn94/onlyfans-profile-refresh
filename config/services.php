@@ -43,7 +43,8 @@ return [
         // is a URL or a local JSON file; they are tried in order, and rules that
         // OnlyFans keeps rejecting are skipped (see SigningRulesProvider).
         'rules_sources' => [
-            'onlyfans.com' => array_values(array_filter(explode(',', (string) env('ONLYFANS_RULES_SOURCES',
+            // An empty ONLYFANS_RULES_SOURCES= in .env means the defaults too.
+            'onlyfans.com' => array_values(array_filter(explode(',', (string) (env('ONLYFANS_RULES_SOURCES') ?:
                 'https://raw.githubusercontent.com/rafa-9/dynamic-rules/main/rules.json,'
                 .'https://raw.githubusercontent.com/DATAHOARDERS/dynamic-rules/main/onlyfans.json,'
                 .'https://raw.githubusercontent.com/datawhores/onlyfans-dynamic-rules/main/dynamicRules.json,'

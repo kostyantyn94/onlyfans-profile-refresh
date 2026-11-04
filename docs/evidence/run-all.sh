@@ -27,6 +27,10 @@ cp "$(ls -t storage/app/workload/legacy-*.json | head -1)" docs/evidence/03-work
 run workload:run --handler=v2 > docs/evidence/04-workload-after-fix-v2.txt 2>&1
 cp "$(ls -t storage/app/workload/v2-*.json | head -1)" docs/evidence/04-workload-after-fix-v2.json
 
+# The fake upstream switches to new signing rules 4 s in, as OnlyFans does with a release.
+{ echo "\$ php artisan workload:run --handler=v2 --rotate-rules=4"; run workload:run --handler=v2 --rotate-rules=4; echo; echo "# signing events in storage/logs/refresh.log during the run:"; grep -h '"onlyfans\.' storage/logs/refresh.log | tail -n 3; } > docs/evidence/13-workload-rules-rotation.txt 2>&1
+cp "$(ls -t storage/app/workload/v2-*.json | head -1)" docs/evidence/13-workload-rules-rotation.json
+
 run workload:crash --at=after-write > docs/evidence/05-crash-after-write.txt 2>&1
 run workload:crash --at=before-write > docs/evidence/06-crash-before-write.txt 2>&1
 run workload:throughput --profiles=3000 > docs/evidence/07-throughput.txt 2>&1

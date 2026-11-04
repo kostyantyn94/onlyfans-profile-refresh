@@ -121,10 +121,54 @@ still serious; all confirmed, fixed unless noted):
   tens of thousands of jobs; per-account queues or scheduler-side admission would fix it), no
   account-level circuit breaker for 5xx, and the 1 MB body cap does not stop the body being read.
 
+## Second round, after your review (4 Nov)
+
+Same tool, same way of working: Claude Code wrote the OnlyFans client, the fixes, the tests and
+these notes; I set the direction and ran the live checks.
+
+- **The live requests to onlyfans.com were run by me, not the agent.** Claude Code's own safety
+  check refused to let the agent send signed requests to onlyfans.com. So the agent wrote two small
+  probe scripts (which rule feed is current, which headers and cookies a guest request needs, what
+  a bad signature and an unknown user get), I ran them and pasted the output back, and the client
+  was built from that. The full live check through the job is
+  [14](docs/evidence/14-live-onlyfans-fetch.txt), also run by me.
+- **Each of your three findings has a regression test that fails on the reviewed code**, recorded
+  with the fix stashed: [12](docs/evidence/12-review-fixes-tests.txt).
+
+Mistakes caught in this round:
+
+- **Two existing tests only passed because of your first finding.** They fed a Fans API snapshot
+  cached at 08:12 to a refresh running hours later; the refresh asked again with `?fresh=true`, got
+  the same old snapshot and stored it as a success. With the fix they failed; they now run at a time
+  shortly after the snapshot, so they test what they were written for.
+- **Guzzle's `SetCookie::validate()` rejects a cookie without a `Domain`**, and OnlyFans sets its
+  `sess` cookie without one: the session would have silently lost its cookie. The client checks
+  names and values itself instead.
+- **The rules format `"prefix:{}:{:x}:suffix"` has a colon inside `{:x}`.** Splitting it into four
+  parts gave the wrong suffix, in the first probe script and in the fake upstream. The fake one was
+  caught by a workload in which every signature was rejected; that run also showed the protection
+  working: after two rejections of the same rules the client stopped sending (2 requests in total,
+  every refresh recorded `rules_unavailable`).
+- **The workload report undercounted "reported successful"**: `last_success_at` has whole seconds
+  and was compared with a start time that has microseconds, so refreshes finished in the first
+  second were missed. Fixed in the report; the stored data was right.
+- **`php artisan migrate --env=testing` ran against the local database**, because there is no
+  `.env.testing`. Harmless here (it was the new migration, which sets every existing account to the
+  Fans API driver), but the tests migrate their own database and that command was not needed.
+
 ## Not verified
 
-- That `favoritedCount` is the "likes" number OnlyFans shows on the profile: taken from the field
-  name and Fans API usage. The browser tool refused to open onlyfans.com.
+- That `favoritedCount` is the "likes" number OnlyFans shows on the profile page: it is the field
+  OnlyFans' own api2 returns and Fans API passes on, but the browser tool refused to open
+  onlyfans.com, so the page itself was not compared.
+- How long a guest session stays valid, and how many requests OnlyFans allows per session or per
+  IP before it throttles: only a handful of live requests were made. 429 and 5xx from OnlyFans were
+  never seen live; their handling is tested against fakes.
+- Which public rule feed stays current: on 4 Nov one of the four (rafa-9) was, two were outdated,
+  one was not read because of the format bug above. The client tries them in order and moves on
+  after repeated rejections; extracting the rules from OnlyFans' own JavaScript is not done.
+- The logged-in session mode (an account whose credential holds a browser session's user id,
+  cookies and x-bc): tested with fakes only, no real logged-in session was used.
 - Real Fans API error responses (429/5xx shape, whether `Retry-After` is sent): every live call
   returned 200.
 - Setup on macOS or Linux; only Windows 11 + Docker Desktop was used.

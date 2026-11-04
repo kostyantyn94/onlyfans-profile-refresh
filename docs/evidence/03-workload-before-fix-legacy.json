@@ -1,6 +1,6 @@
 {
     "handler": "legacy",
-    "started_at": "2026-11-01T21:09:24+00:00",
+    "started_at": "2026-11-04T00:15:43+00:00",
     "parameters": {
         "busy_profiles": 40,
         "calm_profiles": 10,
@@ -9,6 +9,8 @@
         "busy_empty_500_every": 10,
         "format": "mixed",
         "latency_ms": 50,
+        "client": "onlyfans: signed api2 requests, guest session",
+        "signing_rules_rotated_after_s": null,
         "horizon_refresh_workers": 4,
         "account_concurrency": 2,
         "legacy_retry": {
@@ -26,32 +28,32 @@
             "wrong_data": 19,
             "wrong_data_examples": [
                 {
-                    "username": "busy-028",
+                    "username": "busy-001",
                     "likes": 0,
-                    "revision": 11
+                    "revision": null
                 },
                 {
-                    "username": "busy-030",
+                    "username": "busy-002",
                     "likes": 0,
-                    "revision": 11
+                    "revision": null
                 },
                 {
-                    "username": "busy-032",
+                    "username": "busy-005",
                     "likes": 0,
                     "revision": 11
                 }
             ],
             "failed_for_good": 0,
-            "upstream_requests": 71,
+            "upstream_requests": 68,
             "upstream_statuses": {
-                "200": 36,
-                "429": 33,
-                "500": 2
+                "200": 38,
+                "429": 26,
+                "500": 4
             },
             "attempts_recorded_by_app": 40,
-            "attempts_per_verified_success": 3.38,
-            "max_oldest_wait_s": 16.4,
-            "all_finished_after_s": 16
+            "attempts_per_verified_success": 3.24,
+            "max_oldest_wait_s": 16.2,
+            "all_finished_after_s": 15.7
         },
         "calm": {
             "refreshes_queued": 10,
@@ -84,8 +86,8 @@
             },
             "attempts_recorded_by_app": 10,
             "attempts_per_verified_success": 2,
-            "max_oldest_wait_s": 15.9,
-            "all_finished_after_s": 15.5
+            "max_oldest_wait_s": 15.5,
+            "all_finished_after_s": 15
         }
     },
     "timeline": [
@@ -93,12 +95,12 @@
             "t": 0,
             "busy": {
                 "waiting": 40,
-                "oldest_wait_s": 0.8,
+                "oldest_wait_s": 0.9,
                 "refreshed_ok": 0
             },
             "calm": {
                 "waiting": 10,
-                "oldest_wait_s": 0.8,
+                "oldest_wait_s": 0.9,
                 "refreshed_ok": 0
             }
         },
@@ -106,12 +108,12 @@
             "t": 1,
             "busy": {
                 "waiting": 40,
-                "oldest_wait_s": 1.8,
+                "oldest_wait_s": 1.9,
                 "refreshed_ok": 0
             },
             "calm": {
                 "waiting": 10,
-                "oldest_wait_s": 1.8,
+                "oldest_wait_s": 1.9,
                 "refreshed_ok": 0
             }
         },
@@ -119,12 +121,12 @@
             "t": 2,
             "busy": {
                 "waiting": 40,
-                "oldest_wait_s": 2.8,
+                "oldest_wait_s": 2.9,
                 "refreshed_ok": 0
             },
             "calm": {
                 "waiting": 10,
-                "oldest_wait_s": 2.8,
+                "oldest_wait_s": 2.9,
                 "refreshed_ok": 0
             }
         },
@@ -132,25 +134,25 @@
             "t": 3,
             "busy": {
                 "waiting": 40,
-                "oldest_wait_s": 3.8,
+                "oldest_wait_s": 3.9,
                 "refreshed_ok": 0
             },
             "calm": {
                 "waiting": 10,
-                "oldest_wait_s": 3.8,
+                "oldest_wait_s": 3.9,
                 "refreshed_ok": 0
             }
         },
         {
             "t": 4,
             "busy": {
-                "waiting": 38,
-                "oldest_wait_s": 4.8,
+                "waiting": 39,
+                "oldest_wait_s": 4.9,
                 "refreshed_ok": 0
             },
             "calm": {
                 "waiting": 10,
-                "oldest_wait_s": 4.8,
+                "oldest_wait_s": 4.9,
                 "refreshed_ok": 0
             }
         },
@@ -158,25 +160,25 @@
             "t": 5,
             "busy": {
                 "waiting": 38,
-                "oldest_wait_s": 5.8,
+                "oldest_wait_s": 5.9,
                 "refreshed_ok": 0
             },
             "calm": {
                 "waiting": 10,
-                "oldest_wait_s": 5.8,
+                "oldest_wait_s": 5.9,
                 "refreshed_ok": 0
             }
         },
         {
             "t": 6,
             "busy": {
-                "waiting": 38,
-                "oldest_wait_s": 6.8,
+                "waiting": 37,
+                "oldest_wait_s": 6.9,
                 "refreshed_ok": 0
             },
             "calm": {
                 "waiting": 10,
-                "oldest_wait_s": 6.8,
+                "oldest_wait_s": 6.9,
                 "refreshed_ok": 0
             }
         },
@@ -184,125 +186,112 @@
             "t": 7,
             "busy": {
                 "waiting": 31,
-                "oldest_wait_s": 7.8,
+                "oldest_wait_s": 7.9,
                 "refreshed_ok": 3
             },
             "calm": {
                 "waiting": 10,
-                "oldest_wait_s": 7.8,
+                "oldest_wait_s": 7.9,
                 "refreshed_ok": 0
             }
         },
         {
             "t": 8,
             "busy": {
-                "waiting": 31,
-                "oldest_wait_s": 8.8,
-                "refreshed_ok": 3
+                "waiting": 27,
+                "oldest_wait_s": 8.9,
+                "refreshed_ok": 5
             },
             "calm": {
                 "waiting": 10,
-                "oldest_wait_s": 8.8,
+                "oldest_wait_s": 8.9,
                 "refreshed_ok": 0
             }
         },
         {
             "t": 9,
             "busy": {
-                "waiting": 24,
-                "oldest_wait_s": 9.8,
+                "waiting": 23,
+                "oldest_wait_s": 9.9,
                 "refreshed_ok": 7
             },
             "calm": {
                 "waiting": 10,
-                "oldest_wait_s": 9.8,
+                "oldest_wait_s": 9.9,
                 "refreshed_ok": 0
             }
         },
         {
             "t": 10,
             "busy": {
-                "waiting": 19,
-                "oldest_wait_s": 10.8,
+                "waiting": 18,
+                "oldest_wait_s": 10.9,
                 "refreshed_ok": 10
             },
             "calm": {
                 "waiting": 10,
-                "oldest_wait_s": 10.8,
+                "oldest_wait_s": 10.9,
                 "refreshed_ok": 0
             }
         },
         {
             "t": 11,
             "busy": {
-                "waiting": 19,
-                "oldest_wait_s": 11.8,
-                "refreshed_ok": 10
+                "waiting": 13,
+                "oldest_wait_s": 11.9,
+                "refreshed_ok": 13
             },
             "calm": {
                 "waiting": 10,
-                "oldest_wait_s": 11.8,
+                "oldest_wait_s": 11.9,
                 "refreshed_ok": 0
             }
         },
         {
             "t": 12,
             "busy": {
-                "waiting": 14,
-                "oldest_wait_s": 12.8,
-                "refreshed_ok": 12
+                "waiting": 12,
+                "oldest_wait_s": 13,
+                "refreshed_ok": 14
             },
             "calm": {
                 "waiting": 10,
-                "oldest_wait_s": 12.8,
+                "oldest_wait_s": 13,
                 "refreshed_ok": 0
             }
         },
         {
             "t": 13,
             "busy": {
-                "waiting": 14,
-                "oldest_wait_s": 13.8,
-                "refreshed_ok": 12
+                "waiting": 7,
+                "oldest_wait_s": 14,
+                "refreshed_ok": 17
             },
             "calm": {
                 "waiting": 10,
-                "oldest_wait_s": 13.8,
+                "oldest_wait_s": 14,
                 "refreshed_ok": 0
             }
         },
         {
             "t": 14,
             "busy": {
-                "waiting": 6,
-                "oldest_wait_s": 14.6,
-                "refreshed_ok": 17
+                "waiting": 3,
+                "oldest_wait_s": 15,
+                "refreshed_ok": 20
             },
             "calm": {
-                "waiting": 10,
-                "oldest_wait_s": 14.6,
-                "refreshed_ok": 0
+                "waiting": 8,
+                "oldest_wait_s": 15,
+                "refreshed_ok": 1
             }
         },
         {
             "t": 15,
             "busy": {
-                "waiting": 6,
-                "oldest_wait_s": 15.6,
-                "refreshed_ok": 17
-            },
-            "calm": {
-                "waiting": 10,
-                "oldest_wait_s": 15.6,
-                "refreshed_ok": 0
-            }
-        },
-        {
-            "t": 16,
-            "busy": {
-                "waiting": 0,
-                "oldest_wait_s": 0,
-                "refreshed_ok": 21
+                "waiting": 2,
+                "oldest_wait_s": 16,
+                "refreshed_ok": 20
             },
             "calm": {
                 "waiting": 0,
