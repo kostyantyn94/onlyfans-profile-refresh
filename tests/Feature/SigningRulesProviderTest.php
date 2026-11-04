@@ -95,12 +95,47 @@ class SigningRulesProviderTest extends TestCase
         Http::assertSentCount(2);
     }
 
+    public function test_the_only_source_is_never_skipped(): void
+    {
+        config(['services.onlyfans.rules_sources' => ['upstream.test' => [self::FIRST]]]);
+        $rules = $this->provider->for(self::BASE);
+
+        // Two sessions rejected and nothing else to try: refusing to send would stop
+        // every refresh for good, so the rules stay in use (and are reloaded).
+        $this->provider->reject(self::BASE, $rules, str_repeat('a', 40));
+        $this->provider->reject(self::BASE, $rules, str_repeat('b', 40));
+
+        $this->assertSame('12345', $this->provider->for(self::BASE)->prefix);
+        $loaded = collect($this->refreshLogLines())->where('message', 'onlyfans.rules_loaded')->last();
+        $this->assertTrue($loaded['context']['rejected_recently']);
+    }
+
+    public function test_a_newer_release_reloads_the_rules_once_however_many_responses_show_it(): void
+    {
+        $web = new SyntheticWebApp(self::WEB_RULES);
+        config(['services.onlyfans.rules_sources' => ['upstream.test' => ['webapp:https://upstream.test/']]]);
+        Http::fake([
+            'upstream.test/' => Http::response($web->page()),
+            SyntheticWebApp::BASE.'app.js' => Http::response($web->app()),
+            SyntheticWebApp::BASE.'7777.js' => Http::response($web->chunk()),
+        ]);
+        $rules = $this->provider->for(self::BASE);
+
+        // The page still serves the old release (a CDN lags); OnlyFans' API already answers from the new one.
+        foreach (range(1, 3) as $i) {
+            $this->provider->accepted(self::BASE, $rules, '202611050900-0123456789');
+            $this->provider->for(self::BASE);
+        }
+
+        Http::assertSentCount(4);
+    }
+
     public function test_the_rejection_window_does_not_slide(): void
     {
         config(['services.onlyfans.rules_reject_limit' => 3]);
         $rules = $this->provider->for(self::BASE);
         $this->provider->reject(self::BASE, $rules, str_repeat('a', 40));
-        $key = 'onlyfans:rules-rejected:upstream.test:'.$rules->fingerprint();
+        $key = 'onlyfans:rules-rejected:upstream.test:'.$rules->fingerprint().':-';
         Redis::expire($key, 100);
 
         $this->provider->reject(self::BASE, $rules, str_repeat('b', 40));

@@ -56,8 +56,9 @@ class SessionStore
             return $stored;
         }
 
-        if (Cache::has($this->key($account))) {
-            // Stored but unreadable (e.g. APP_KEY rotated): it would block the new one below.
+        // Stored but unreadable (e.g. APP_KEY rotated): it would block the new one
+        // below. Read again first: another worker may have just stored a good one.
+        if (Cache::has($this->key($account)) && $this->load($account) === null) {
             $this->forget($account);
         }
 

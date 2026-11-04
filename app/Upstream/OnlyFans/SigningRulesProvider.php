@@ -23,6 +23,8 @@ use Throwable;
  *    have newer rules) and counts the *sessions* that got rejected with these
  *    rules; only when rules_reject_limit different sessions were rejected within
  *    one rules_skip_minutes window are the rules skipped for the next source.
+ *    The last source with valid rules is never skipped: sending nothing would
+ *    stop every refresh, with no request left to prove the rules good again.
  *    Rules OnlyFans accepted in the last 10 minutes are not counted against:
  *    then it is the sessions that are refused, not the rules.
  *  - OnlyFans names its current release in every response (x-of-rev). A release
@@ -109,7 +111,7 @@ class SigningRulesProvider
         $host = $this->host($baseUrl);
 
         if ($this->isNewerRelease($rules, $webAppRevision)) {
-            $this->markForReload($host, $rules);
+            $this->reloadForRelease($host, $webAppRevision);
         }
 
         if (Cache::add($this->provenKey($host, $rules), now()->timestamp, self::PROVEN_FOR)) {
@@ -120,9 +122,9 @@ class SigningRulesProvider
     /**
      * OnlyFans refused a request signed with these rules. Unless they were
      * accepted recently, remember which session was refused; once enough
-     * different sessions were within one window, the rules are skipped for the
-     * rest of it. The cached copy is reloaded (one worker, while the others keep
-     * signing), or dropped if the rules are now skipped.
+     * different sessions were within one window, the next source is preferred
+     * for the rest of it. The cached copy is reloaded (one worker, while the
+     * others keep signing).
      *
      * @param  string  $sessionToken  the session's x-bc, stored only as a hash
      * @param  ?string  $webAppRevision  OnlyFans' x-of-rev header: its current web app release
@@ -147,17 +149,15 @@ class SigningRulesProvider
         }
 
         $sessions = (int) Redis::scard($key);
-        $skipped = $sessions >= (int) config('services.onlyfans.rules_reject_limit');
-        $cached = Cache::get($this->cacheKey($host));
+        $limit = (int) config('services.onlyfans.rules_reject_limit');
+        $skipped = $sessions >= $limit;
 
-        // Another worker may have loaded newer rules meanwhile; keep those.
-        if (($cached['fingerprint'] ?? null) === $rules->fingerprint()) {
-            if ($skipped) {
-                // No longer a last good copy to fall back on.
-                Cache::forget($this->cacheKey($host));
-            } elseif ($newRelease || $sentAtMs === null || (int) $cached['loaded_at'] <= intdiv($sentAtMs, 1000)) {
-                $this->markForReload($host, $rules);
-            }
+        if ($newRelease) {
+            $this->reloadForRelease($host, $webAppRevision);
+        } elseif ($sessions === $limit || $sentAtMs === null || (int) (Cache::get($this->cacheKey($host))['loaded_at'] ?? 0) <= intdiv($sentAtMs, 1000)) {
+            // Reloaded once when the rules have just been skipped (the next source may
+            // take over), else only if loaded before this request was sent.
+            $this->markForReload($host, $rules);
         }
 
         Log::channel('refresh')->warning('onlyfans.signature_rejected', [
@@ -180,13 +180,36 @@ class SigningRulesProvider
             && strcmp(substr($webAppRevision, 0, 12), substr($rules->release, 0, 12)) > 0;
     }
 
-    /** Past their TTL from now on: the next request reloads them in one worker, the others keep signing. */
+    /**
+     * Past their TTL from now on: the next request reloads them in one worker,
+     * the others keep signing. Only if they are still the cached rules: another
+     * worker may have loaded newer ones meanwhile.
+     */
     private function markForReload(string $host, SigningRules $rules): void
     {
         $cached = Cache::get($this->cacheKey($host));
 
         if (($cached['fingerprint'] ?? null) === $rules->fingerprint() && (int) $cached['loaded_at'] > 0) {
-            Cache::put($this->cacheKey($host), [...$cached, 'loaded_at' => 0], now()->addDay());
+            Cache::forever($this->cacheKey($host), [...$cached, 'loaded_at' => 0]);
+        }
+    }
+
+    /**
+     * OnlyFans answers from a release newer than the cached rules were read from:
+     * reload them, once per release however many responses show it (the page may
+     * still serve the old release for a while).
+     */
+    private function reloadForRelease(string $host, string $revision): void
+    {
+        $cached = Cache::get($this->cacheKey($host));
+        $release = is_array($cached) ? ($cached['rules']['release'] ?? null) : null;
+
+        if ($release === null || strcmp(substr($revision, 0, 12), substr((string) $release, 0, 12)) <= 0) {
+            return;
+        }
+
+        if (Cache::add('onlyfans:rules-reload-for:'.$host.':'.$revision, now()->timestamp, 300)) {
+            Cache::forever($this->cacheKey($host), [...$cached, 'loaded_at' => 0]);
         }
     }
 
@@ -227,13 +250,14 @@ class SigningRulesProvider
 
     private function store(string $host, SigningRules $rules): SigningRules
     {
-        // Kept a day, but reloaded after rules_ttl_minutes (see cached()).
-        Cache::put($this->cacheKey($host), [
+        // Kept until replaced: reloaded after rules_ttl_minutes (see cached()), and
+        // still the last good copy however long the sources fail.
+        Cache::forever($this->cacheKey($host), [
             'rules' => $rules->toArray(),
             'source' => $rules->source,
             'fingerprint' => $rules->fingerprint(),
             'loaded_at' => now()->timestamp,
-        ], now()->addDay());
+        ]);
         Cache::forget($this->unavailableKey($host));
 
         return $rules;
@@ -244,6 +268,7 @@ class SigningRulesProvider
         $sources = config('services.onlyfans.rules_sources')[$host] ?? [];
         $problems = [];
         $deadline = microtime(true) + self::LOAD_BUDGET;
+        $rejected = null;
 
         foreach ($sources as $source) {
             try {
@@ -258,26 +283,42 @@ class SigningRulesProvider
 
             if ($this->isSkipped($host, $rules)) {
                 $problems[] = $source.': rejected by OnlyFans for '.config('services.onlyfans.rules_reject_limit').' sessions recently';
+                $rejected ??= $rules;
 
                 continue;
             }
 
-            Log::channel('refresh')->info('onlyfans.rules_loaded', [
-                'host' => $host,
-                'rules_source' => $source,
-                'rules' => substr($rules->fingerprint(), 0, 12),
-                'release' => $rules->release,
-                // Earlier sources that gave nothing usable, and why (e.g. the web app's code changed shape).
-                'passed_over' => $problems,
-            ]);
+            return $this->loaded($host, $rules, $problems);
+        }
 
-            return $rules;
+        if ($rejected !== null) {
+            // Every source's rules were rejected recently. Sending nothing would stop
+            // every refresh with no way back (only an accepted request clears the
+            // count), so the first source's rules stay in use; each refresh is still
+            // bounded by its signature_rejected tries.
+            return $this->loaded($host, $rejected, $problems);
         }
 
         Log::channel('refresh')->error('onlyfans.rules_unavailable', ['host' => $host, 'problems' => $problems]);
 
         throw new SigningRulesUnavailable("no usable signing rules for {$host}: "
             .($problems === [] ? 'no source configured' : implode('; ', $problems)));
+    }
+
+    /** @param  list<string>  $problems  earlier sources that gave nothing usable, and why */
+    private function loaded(string $host, SigningRules $rules, array $problems): SigningRules
+    {
+        Log::channel('refresh')->info('onlyfans.rules_loaded', [
+            'host' => $host,
+            'rules_source' => $rules->source,
+            'rules' => substr($rules->fingerprint(), 0, 12),
+            'release' => $rules->release,
+            // e.g. the web app's code changed shape, or its rules were rejected recently.
+            'passed_over' => $problems,
+            'rejected_recently' => $this->isSkipped($host, $rules),
+        ]);
+
+        return $rules;
     }
 
     /** A source is "webapp:<page URL>" (see WebAppRulesSource), a rules URL, or a JSON file (absolute, or relative to the project). */
@@ -339,7 +380,8 @@ class SigningRulesProvider
     // In Redis directly (a set of hashed session tokens); the rest is in the cache.
     private function rejectionsKey(string $host, SigningRules $rules): string
     {
-        return 'onlyfans:rules-rejected:'.$host.':'.$rules->fingerprint();
+        // Per release too: a new release with unchanged values starts with a clean count.
+        return 'onlyfans:rules-rejected:'.$host.':'.$rules->fingerprint().':'.($rules->release ?? '-');
     }
 
     private function provenKey(string $host, SigningRules $rules): string

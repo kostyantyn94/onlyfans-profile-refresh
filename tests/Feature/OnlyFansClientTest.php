@@ -30,7 +30,7 @@ class OnlyFansClientTest extends TestCase
 
     public function test_the_request_is_signed_like_the_web_app_does_it(): void
     {
-        $profile = $this->profileWithValidData(attributes: ['likes_count' => null, 'revision' => null]);
+        $profile = $this->profileWithValidData(attributes: ['username' => 'madison420ivy', 'likes_count' => null, 'revision' => null]);
         Http::fake(['upstream.test/api2/v2/users/*' => Http::response($this->user())]);
 
         $this->runRefresh($profile);
@@ -63,7 +63,7 @@ class OnlyFansClientTest extends TestCase
         ];
         $web = new SyntheticWebApp($rules, 4);
         config(['services.onlyfans.rules_sources' => ['upstream.test' => ['webapp:https://upstream.test/']]]);
-        $profile = $this->profileWithValidData();
+        $profile = $this->profileWithValidData(attributes: ['username' => 'madison420ivy']);
         Http::fake([
             'upstream.test/api2/*' => Http::response($this->user()),
             'upstream.test/' => Http::response($web->page()),
@@ -88,7 +88,7 @@ class OnlyFansClientTest extends TestCase
 
     public function test_the_real_onlyfans_response_stores_the_full_profile(): void
     {
-        $profile = $this->profileWithValidData(attributes: ['likes_count' => null, 'revision' => null, 'name' => null]);
+        $profile = $this->profileWithValidData(attributes: ['username' => 'madison420ivy', 'likes_count' => null, 'revision' => null, 'name' => null]);
         Http::fake(['upstream.test/api2/v2/users/*' => Http::response($this->fixture('onlyfans-madison420ivy.json'))]);
 
         $this->runRefresh($profile);
@@ -147,7 +147,7 @@ class OnlyFansClientTest extends TestCase
     public function test_a_rejected_signature_renews_the_session_and_moves_to_the_next_rules_source(): void
     {
         config(['services.onlyfans.rules_sources' => ['upstream.test' => [self::STALE_RULES, self::NEW_RULES]]]);
-        $profile = $this->profileWithValidData();
+        $profile = $this->profileWithValidData(attributes: ['username' => 'madison420ivy']);
         $refreshId = (string) Str::uuid();
         // OnlyFans accepts only the rotated rules (prefix 67890).
         Http::fake(fn (Request $request) => str_starts_with($request->header('sign')[0], '67890:')

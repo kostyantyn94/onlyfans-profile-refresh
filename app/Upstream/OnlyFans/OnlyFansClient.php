@@ -5,6 +5,7 @@ namespace App\Upstream\OnlyFans;
 use App\Models\Account;
 use App\Upstream\ProfileClient;
 use App\Upstream\UpstreamResponse;
+use Closure;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -24,7 +25,7 @@ class OnlyFansClient implements ProfileClient
     ) {}
 
     /** OnlyFans always answers with live data, so $fresh changes nothing here. */
-    public function fetchProfile(Account $account, string $username, bool $fresh = false): UpstreamResponse
+    public function fetchProfile(Account $account, string $username, bool $fresh = false, ?Closure $beforeSend = null): UpstreamResponse
     {
         $rules = $this->rules->for($account->base_url);
         $session = $this->sessions->for($account);
@@ -56,6 +57,10 @@ class OnlyFansClient implements ProfileClient
 
         if ($session->liveCookies() !== []) {
             $headers['Cookie'] = $session->cookieHeader();
+        }
+
+        if ($beforeSend !== null) {
+            $beforeSend();
         }
 
         $started = hrtime(true);

@@ -6,7 +6,6 @@ use App\Models\Account;
 use App\Models\Profile;
 use App\Models\RefreshAttempt;
 use App\Refresh\RefreshScheduler;
-use App\Upstream\OnlyFans\SessionStore;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -128,7 +127,7 @@ class RunWorkload extends Command
             $report['accounts'][$slug] = $this->summarize($account, $fake, $startedAt, $maxWait[$slug], $drainedAt[$slug] ?? null);
         }
 
-        $report['secrets_in_logs'] = $this->secretsInLogs($accounts, $logOffset);
+        [$report['secrets_in_logs'], $report['secrets_checked']] = $this->secretsInLogs($accounts, $logOffset);
         $report['failed_jobs'] = DB::table('failed_jobs')->where('failed_at', '>=', $startedAt)->count();
 
         $this->printReport($report);
@@ -302,20 +301,26 @@ class RunWorkload extends Command
         ];
     }
 
-    /** Occurrences of the accounts' session tokens (x-bc, cookies) or keys in the logs. */
-    private function secretsInLogs(array $accounts, int $offset): int
+    /**
+     * Occurrences in the logs of every session token the fake upstream saw or
+     * handed out during the run (each x-bc, each sess cookie, also of sessions
+     * dropped mid-run) and of the accounts' keys.
+     *
+     * @return array{0: int, 1: int} occurrences found, secrets checked
+     */
+    private function secretsInLogs(array $accounts, int $offset): array
     {
         $path = storage_path('logs/refresh.log');
         $log = is_file($path) ? (string) file_get_contents($path, offset: $offset) : '';
         $log .= is_file(storage_path('logs/laravel.log')) ? (string) file_get_contents(storage_path('logs/laravel.log')) : '';
+        $fake = Redis::connection('fake_upstream');
 
-        $secrets = collect($accounts)->flatMap(function (Account $account) {
-            $session = app(SessionStore::class)->for($account);
+        $secrets = collect($accounts)->flatMap(fn (Account $account) => [
+            $account->api_key,
+            ...($fake->sMembers('fake-upstream:secrets:'.$account->slug) ?: []),
+        ])->filter()->unique();
 
-            return [$account->api_key, $session->xBc, ...array_values($session->cookies)];
-        })->filter()->unique();
-
-        return $secrets->sum(fn (string $secret) => substr_count($log, $secret));
+        return [$secrets->sum(fn (string $secret) => substr_count($log, $secret)), $secrets->count()];
     }
 
     private function printReport(array $report): void
@@ -334,6 +339,6 @@ class RunWorkload extends Command
 
         $this->table(['metric', 'busy', 'calm'], $rows);
         $this->line("Failed jobs in Horizon during the run: {$report['failed_jobs']}");
-        $this->line("Session tokens or keys found in logs: {$report['secrets_in_logs']}");
+        $this->line("Session tokens or keys found in logs: {$report['secrets_in_logs']} (of {$report['secrets_checked']} the fake upstream saw)");
     }
 }

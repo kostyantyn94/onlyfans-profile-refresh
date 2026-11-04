@@ -100,13 +100,21 @@ if (preg_match('#^/([a-z0-9_-]{1,32})/api2/v2/users/([A-Za-z0-9_.-]{1,64})$#', $
         && ctype_digit($time) && abs((int) $time - (int) (microtime(true) * 1000)) < 300_000
         && hash_equals(expectedSign($rules, $uri, $time, $_SERVER['HTTP_USER_ID'] ?? '0'), $_SERVER['HTTP_SIGN'] ?? '');
 
+    // Every session token seen or handed out, so the workload can look for each
+    // one in the app's logs (workload:run, "Session tokens or keys found in logs").
+    if (preg_match('/^[a-f0-9]{40}$/', $_SERVER['HTTP_X_BC'] ?? '') === 1) {
+        $redis->sAdd("fake-upstream:secrets:{$account}", $_SERVER['HTTP_X_BC']);
+    }
+
     if (! $signed) {
         respond($redis, $account, 400, ['error' => ['code' => 401, 'message' => 'Please refresh the page']]);
     }
 
     // A guest session cookie, as OnlyFans sets one on its responses.
     if (! isset($_COOKIE['sess'])) {
-        header('Set-Cookie: sess='.bin2hex(random_bytes(12)).'; Max-Age=864000; path=/; HttpOnly', false);
+        $sess = bin2hex(random_bytes(12));
+        $redis->sAdd("fake-upstream:secrets:{$account}", $sess);
+        header('Set-Cookie: sess='.$sess.'; Max-Age=864000; path=/; HttpOnly', false);
     }
 } elseif (preg_match('#^/api/profiles/([A-Za-z0-9_.-]{1,64})$#', $path, $match)) {
     $username = $match[1];

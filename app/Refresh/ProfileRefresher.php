@@ -136,13 +136,18 @@ class ProfileRefresher
      */
     private function fetchValid(RefreshProfile $job, Profile $profile, int $attempt, array $context, bool $fresh): ?array
     {
-        // The attempt is recorded before the call, in its own commit, so the budget
-        // counts every request sent: also one whose worker dies before the answer
-        // is stored (it stays "in_flight", and a redelivery makes the next one).
-        $row = $this->startAttempt($job, $profile);
+        $row = null;
 
         try {
-            $response = $this->clients->for($profile->account)->fetchProfile($profile->account, $profile->username, $fresh);
+            $response = $this->clients->for($profile->account)->fetchProfile($profile->account, $profile->username, $fresh,
+                // The attempt is recorded right before the request goes out, in its own
+                // commit, so the budget counts every request sent: also one whose worker
+                // dies before the answer is stored (it stays "in_flight", and a
+                // redelivery makes the next one). Nothing is recorded if building the
+                // request fails (e.g. Redis down): nothing was sent.
+                function () use (&$row, $job, $profile) {
+                    $row = $this->startAttempt($job, $profile);
+                });
         } catch (ConnectionException $e) {
             $this->failed($job, $profile, $row, $attempt, Outcome::Timeout, $this->clean($e->getMessage()), null, $context);
 
@@ -151,7 +156,6 @@ class ProfileRefresher
             if ($e->loading) {
                 // Another worker is loading the rules this moment: nothing was sent and
                 // nothing is decided yet, so no attempt is spent. Try again shortly.
-                $row->delete();
                 Log::channel('refresh')->debug('refresh.deferred', [...$context, 'reason' => 'signing_rules_loading', 'delay_seconds' => 3]);
                 $job->release(3);
 
@@ -179,11 +183,41 @@ class ProfileRefresher
         }
 
         try {
-            return [$response, $this->parser->parse($response->body, $response->sentAtMs), $row];
+            $snapshot = $this->parser->parse($response->body, $response->sentAtMs);
+            $this->assertSameProfile($profile, $snapshot);
+
+            return [$response, $snapshot, $row];
         } catch (InvalidProfilePayload $e) {
             $this->failed($job, $profile, $row, $attempt, Outcome::InvalidResponse, 'invalid response: '.$e->getMessage(), $response, $context);
 
             return null;
+        }
+    }
+
+    /**
+     * The answer must be the profile that was asked for: never write one
+     * creator's data into another's row (a misrouted response, or a username
+     * that now belongs to a different account).
+     *
+     * @throws InvalidProfilePayload
+     */
+    private function assertSameProfile(Profile $profile, ProfileSnapshot $snapshot): void
+    {
+        // Only the real upstream formats carry an identity; the incident's test formats do not.
+        if (! in_array($snapshot->format, ['onlyfans', 'fansapi'], true)) {
+            return;
+        }
+
+        $username = $snapshot->raw['username'] ?? null;
+
+        if (is_string($username) && strcasecmp($username, $profile->username) !== 0) {
+            throw new InvalidProfilePayload("the answer is for {$username}, not {$profile->username}");
+        }
+
+        $id = $snapshot->attributes['upstream_id'] ?? null;
+
+        if ($id !== null && $profile->upstream_id !== null && (int) $id !== (int) $profile->upstream_id) {
+            throw new InvalidProfilePayload("upstream id {$id}, but {$profile->username} was {$profile->upstream_id}: the username belongs to another account now");
         }
     }
 
@@ -223,7 +257,7 @@ class ProfileRefresher
         Log::channel('refresh')->error('refresh.gave_up', [...$this->context($job, $profile), 'reason' => $reason]);
     }
 
-    private function failed(RefreshProfile $job, Profile $profile, RefreshAttempt $row, int $attempt, Outcome $outcome, string $reason, ?UpstreamResponse $response, array $context): void
+    private function failed(RefreshProfile $job, Profile $profile, ?RefreshAttempt $row, int $attempt, Outcome $outcome, string $reason, ?UpstreamResponse $response, array $context): void
     {
         $now = CarbonImmutable::now();
         $sameKind = RefreshAttempt::query()
@@ -248,7 +282,9 @@ class ProfileRefresher
 
         DB::transaction(function () use ($job, $profile, $row, $outcome, $reason, $response, $final, $delay, $now) {
             $this->store->recordFailure($profile, $outcome, $reason, $job->refreshId, $final, $now);
-            $this->finishAttempt($row, $outcome, $response, retryIn: $delay, error: $reason);
+            // No row when nothing was sent (no usable rules): recorded all the same, so
+            // the retry budget bounds how long a refresh waits for them.
+            $this->finishAttempt($row ?? $this->startAttempt($job, $profile), $outcome, $response, retryIn: $delay, error: $reason);
         });
 
         Log::channel('refresh')->log($final ? 'error' : 'warning', $final ? 'refresh.failed' : 'refresh.retry_scheduled', [

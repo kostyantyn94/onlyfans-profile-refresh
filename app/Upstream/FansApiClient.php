@@ -3,6 +3,7 @@
 namespace App\Upstream;
 
 use App\Models\Account;
+use Closure;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 
@@ -19,13 +20,19 @@ class FansApiClient implements ProfileClient
      *
      * @throws ConnectionException on connect/read timeouts and network errors
      */
-    public function fetchProfile(Account $account, string $username, bool $fresh = false): UpstreamResponse
+    public function fetchProfile(Account $account, string $username, bool $fresh = false, ?Closure $beforeSend = null): UpstreamResponse
     {
+        $token = (string) $account->credential();
+
+        if ($beforeSend !== null) {
+            $beforeSend();
+        }
+
         $sentAtMs = (int) floor(microtime(true) * 1000);
         $started = hrtime(true);
 
         $response = Http::baseUrl($account->base_url)
-            ->withToken((string) $account->credential())
+            ->withToken($token)
             ->acceptJson()
             ->withUserAgent('profile-refresher/1.0')
             ->connectTimeout((int) config('refresh.http.connect_timeout'))

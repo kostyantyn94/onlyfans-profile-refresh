@@ -6,6 +6,7 @@ use App\Models\Profile;
 use App\Models\RefreshAttempt;
 use App\Refresh\AccountThrottle;
 use App\Refresh\RefreshScheduler;
+use App\Upstream\OnlyFans\SessionStore;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Queue\MaxAttemptsExceededException;
@@ -30,7 +31,7 @@ class RefreshJobTest extends TestCase
         // Shortly after the fixture was cached by Fans API (08:12:09 UTC), so
         // the cached answer is recent enough to be a refresh.
         $this->travelTo(CarbonImmutable::parse('2026-11-01 08:30:00 UTC'));
-        $profile = $this->profileWithValidData($this->makeFansApiAccount(), ['likes_count' => null, 'revision' => null, 'name' => null]);
+        $profile = $this->profileWithValidData($this->makeFansApiAccount(), ['username' => 'madison420ivy', 'likes_count' => null, 'revision' => null, 'name' => null]);
         Http::fake(['upstream.test/api/profiles/*' => Http::response($this->fixture('fansapi-madison420ivy.json'))]);
 
         $this->runRefresh($profile);
@@ -259,7 +260,7 @@ class RefreshJobTest extends TestCase
     {
         // The fixture was cached by Fans API at 2026-11-01 08:12:09 UTC.
         $this->travelTo(CarbonImmutable::parse('2026-11-01 20:00:00 UTC'));
-        $profile = $this->profileWithValidData($this->makeFansApiAccount(), ['likes_count' => null, 'revision' => null]);
+        $profile = $this->profileWithValidData($this->makeFansApiAccount(), ['username' => 'madison420ivy', 'likes_count' => null, 'revision' => null]);
         $live = json_decode($this->fixture('fansapi-madison420ivy.json'), true);
         $live['data']['favoritedCount'] = 612_000;
         $live['_meta']['_cache'] = ['is_cached' => false, 'cached_at' => '2026-11-01T20:00:00+00:00'];
@@ -280,7 +281,7 @@ class RefreshJobTest extends TestCase
     public function test_a_recent_cached_snapshot_is_used_as_is(): void
     {
         $this->travelTo(CarbonImmutable::parse('2026-11-01 08:30:00 UTC'));
-        $profile = $this->profileWithValidData($this->makeFansApiAccount(), ['likes_count' => null, 'revision' => null]);
+        $profile = $this->profileWithValidData($this->makeFansApiAccount(), ['username' => 'madison420ivy', 'likes_count' => null, 'revision' => null]);
         Http::fake(['*' => Http::response($this->fixture('fansapi-madison420ivy.json'))]);
 
         $this->runRefresh($profile);
@@ -293,7 +294,7 @@ class RefreshJobTest extends TestCase
     {
         // Review finding: the answer to ?fresh=true was stored without checking its age.
         $this->travelTo(CarbonImmutable::parse('2026-11-01 20:00:00 UTC'));
-        $profile = $this->profileWithValidData($this->makeFansApiAccount());
+        $profile = $this->profileWithValidData($this->makeFansApiAccount(), ['username' => 'madison420ivy']);
         $lastSuccess = $profile->last_success_at->timestamp;
         Http::fake(['*' => Http::response($this->fixture('fansapi-madison420ivy.json'))]);
 
@@ -315,7 +316,7 @@ class RefreshJobTest extends TestCase
     {
         // The age comes from cached_at alone; is_cached=false does not make an old snapshot new.
         $this->travelTo(CarbonImmutable::parse('2026-11-01 20:00:00 UTC'));
-        $profile = $this->profileWithValidData($this->makeFansApiAccount());
+        $profile = $this->profileWithValidData($this->makeFansApiAccount(), ['username' => 'madison420ivy']);
         $old = json_decode($this->fixture('fansapi-madison420ivy.json'), true);
         $old['_meta']['_cache']['is_cached'] = false;
         Http::fake(['*' => Http::response($old)]);
@@ -330,7 +331,7 @@ class RefreshJobTest extends TestCase
     {
         // Review finding: the ?fresh=true follow-up could be an 11th call.
         $this->travelTo(CarbonImmutable::parse('2026-11-01 20:00:00 UTC'));
-        $profile = $this->profileWithValidData($this->makeFansApiAccount());
+        $profile = $this->profileWithValidData($this->makeFansApiAccount(), ['username' => 'madison420ivy']);
         $refreshId = (string) Str::uuid();
         $this->previousAttempts($profile, $refreshId, 'rate_limited', 7);
         $this->previousAttempts($profile, $refreshId, 'timeout', 2);
@@ -517,7 +518,7 @@ class RefreshJobTest extends TestCase
     public function test_a_cached_fans_api_answer_without_a_date_is_not_taken_as_fresh(): void
     {
         $this->travelTo(CarbonImmutable::parse('2026-11-01 08:30:00 UTC'));
-        $profile = $this->profileWithValidData($this->makeFansApiAccount());
+        $profile = $this->profileWithValidData($this->makeFansApiAccount(), ['username' => 'madison420ivy']);
         $undated = json_decode($this->fixture('fansapi-madison420ivy.json'), true);
         $undated['_meta']['_cache'] = ['is_cached' => true, 'cached_at' => ''];
         Http::fake(['*' => Http::response($undated)]);
@@ -545,6 +546,45 @@ class RefreshJobTest extends TestCase
         $this->assertSame($new, $profile->pending_refresh_id);
     }
 
+    public function test_an_answer_for_another_profile_is_not_written(): void
+    {
+        // A misrouted answer, or a username that belongs to someone else now.
+        $profile = $this->profileWithValidData(attributes: ['username' => 'madison420ivy', 'upstream_id' => 5_140_520]);
+        Http::fake(['*' => Http::sequence()
+            ->push($this->fixture('onlyfans-madison420ivy.json'))
+            ->push(['id' => 999, 'username' => 'madison420ivy', 'favoritedCount' => 5])
+            ->push(['id' => 5_140_520, 'username' => 'someone-else', 'favoritedCount' => 5])]);
+
+        $this->runRefresh($profile);
+        $this->assertSame(612_018, $profile->refresh()->likes_count, 'the right profile is written');
+
+        $this->runRefresh($profile);
+        $this->runRefresh($profile);
+
+        $this->assertSame(612_018, $profile->refresh()->likes_count);
+        $errors = RefreshAttempt::query()->orderBy('id')->pluck('error')->all();
+        $this->assertStringContainsString('belongs to another account', $errors[1]);
+        $this->assertStringContainsString('the answer is for someone-else', $errors[2]);
+    }
+
+    public function test_nothing_is_recorded_when_the_request_cannot_even_be_built(): void
+    {
+        $profile = $this->profileWithValidData();
+        Http::fake();
+        // E.g. Redis down: the session cannot be read, so nothing goes out.
+        $this->mock(SessionStore::class)->shouldReceive('for')->andThrow(new RuntimeException('Redis went away'));
+
+        try {
+            $this->runRefresh($profile);
+            $this->fail('the job should have thrown');
+        } catch (RuntimeException $e) {
+            $this->assertSame('Redis went away', $e->getMessage());
+        }
+
+        Http::assertNothingSent();
+        $this->assertSame(0, RefreshAttempt::query()->count(), 'no attempt: nothing was sent');
+    }
+
     public function test_waiting_for_another_workers_rules_load_spends_no_attempt(): void
     {
         $profile = $this->profileWithValidData();
@@ -565,7 +605,7 @@ class RefreshJobTest extends TestCase
     public function test_logs_follow_a_refresh_and_never_contain_the_key(): void
     {
         // The OnlyFans session's secrets: OnlyFansClientTest.
-        $profile = $this->profileWithValidData($this->makeFansApiAccount());
+        $profile = $this->profileWithValidData($this->makeFansApiAccount(), ['username' => 'madison420ivy']);
         $refreshId = (string) Str::uuid();
         Http::fake(['*' => Http::sequence()->push('', 429)->push($this->fixture('new-format.json'))]);
 
