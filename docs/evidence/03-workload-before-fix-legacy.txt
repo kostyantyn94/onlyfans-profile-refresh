@@ -1,20 +1,20 @@
-Queued 40 + 10 refreshes with handler=legacy in 0.14 s. Waiting for Horizon...
-  t=  0s  busy: 40 waiting, oldest   0.9s,  0 ok  |  calm: 10 waiting, oldest   0.9s,  0 ok
-  t=  1s  busy: 40 waiting, oldest   1.9s,  0 ok  |  calm: 10 waiting, oldest   1.9s,  0 ok
-  t=  2s  busy: 40 waiting, oldest   2.9s,  0 ok  |  calm: 10 waiting, oldest   2.9s,  0 ok
-  t=  3s  busy: 40 waiting, oldest   3.9s,  0 ok  |  calm: 10 waiting, oldest   3.9s,  0 ok
-  t=  4s  busy: 39 waiting, oldest   4.9s,  0 ok  |  calm: 10 waiting, oldest   4.9s,  0 ok
-  t=  5s  busy: 38 waiting, oldest   5.9s,  0 ok  |  calm: 10 waiting, oldest   5.9s,  0 ok
-  t=  6s  busy: 37 waiting, oldest   6.9s,  0 ok  |  calm: 10 waiting, oldest   6.9s,  0 ok
-  t=  7s  busy: 31 waiting, oldest   7.9s,  3 ok  |  calm: 10 waiting, oldest   7.9s,  0 ok
-  t=  8s  busy: 27 waiting, oldest   8.9s,  5 ok  |  calm: 10 waiting, oldest   8.9s,  0 ok
-  t=  9s  busy: 23 waiting, oldest   9.9s,  7 ok  |  calm: 10 waiting, oldest   9.9s,  0 ok
-  t= 10s  busy: 18 waiting, oldest  10.9s, 10 ok  |  calm: 10 waiting, oldest  10.9s,  0 ok
-  t= 11s  busy: 13 waiting, oldest  11.9s, 13 ok  |  calm: 10 waiting, oldest  11.9s,  0 ok
-  t= 12s  busy: 12 waiting, oldest  13.0s, 14 ok  |  calm: 10 waiting, oldest  13.0s,  0 ok
-  t= 13s  busy:  7 waiting, oldest  14.0s, 17 ok  |  calm: 10 waiting, oldest  14.0s,  0 ok
-  t= 14s  busy:  3 waiting, oldest  15.0s, 20 ok  |  calm:  8 waiting, oldest  15.0s,  1 ok
-  t= 15s  busy:  2 waiting, oldest  16.0s, 20 ok  |  calm:  0 waiting, oldest   0.0s,  5 ok
+Queued 40 + 10 refreshes with handler=legacy in 0.16 s. Waiting for Horizon...
+  t=  0s  busy: 40 waiting, oldest   1.0s,  0 ok  |  calm: 10 waiting, oldest   1.0s,  0 ok
+  t=  1s  busy: 40 waiting, oldest   2.0s,  0 ok  |  calm: 10 waiting, oldest   2.0s,  0 ok
+  t=  2s  busy: 40 waiting, oldest   3.0s,  0 ok  |  calm: 10 waiting, oldest   3.0s,  0 ok
+  t=  3s  busy: 40 waiting, oldest   4.0s,  0 ok  |  calm: 10 waiting, oldest   4.0s,  0 ok
+  t=  4s  busy: 39 waiting, oldest   5.0s,  0 ok  |  calm: 10 waiting, oldest   5.0s,  0 ok
+  t=  5s  busy: 39 waiting, oldest   6.0s,  0 ok  |  calm: 10 waiting, oldest   6.0s,  0 ok
+  t=  6s  busy: 39 waiting, oldest   7.0s,  0 ok  |  calm: 10 waiting, oldest   7.0s,  0 ok
+  t=  7s  busy: 35 waiting, oldest   8.0s,  3 ok  |  calm: 10 waiting, oldest   8.0s,  0 ok
+  t=  8s  busy: 30 waiting, oldest   9.0s,  6 ok  |  calm: 10 waiting, oldest   9.0s,  0 ok
+  t=  9s  busy: 25 waiting, oldest  10.0s,  8 ok  |  calm: 10 waiting, oldest  10.0s,  0 ok
+  t= 10s  busy: 21 waiting, oldest  11.0s, 11 ok  |  calm: 10 waiting, oldest  11.0s,  0 ok
+  t= 11s  busy: 17 waiting, oldest  12.0s, 13 ok  |  calm: 10 waiting, oldest  12.0s,  0 ok
+  t= 12s  busy: 11 waiting, oldest  13.0s, 15 ok  |  calm: 10 waiting, oldest  13.0s,  0 ok
+  t= 13s  busy:  6 waiting, oldest  14.0s, 18 ok  |  calm: 10 waiting, oldest  14.0s,  0 ok
+  t= 14s  busy:  3 waiting, oldest  15.0s, 20 ok  |  calm:  4 waiting, oldest  15.0s,  3 ok
+  t= 15s  busy:  0 waiting, oldest   0.0s, 21 ok  |  calm:  0 waiting, oldest   0.0s,  5 ok
 
 Handler: legacy
 +-------------------------------+-----------------------------+------------+
@@ -27,13 +27,13 @@ Handler: legacy
 | kept_last_valid_data          | 0                           | 0          |
 | wrong_data                    | 19                          | 5          |
 | failed_for_good               | 0                           | 0          |
-| upstream_requests             | 68                          | 10         |
-| upstream_statuses             | {"200":38,"429":26,"500":4} | {"200":10} |
+| upstream_requests             | 64                          | 10         |
+| upstream_statuses             | {"200":38,"429":22,"500":4} | {"200":10} |
 | attempts_recorded_by_app      | 40                          | 10         |
-| attempts_per_verified_success | 3.24                        | 2          |
-| max_oldest_wait_s             | 16.2                        | 15.5       |
-| all_finished_after_s          | 15.7                        | 15         |
+| attempts_per_verified_success | 3.05                        | 2          |
+| max_oldest_wait_s             | 15.8                        | 15         |
+| all_finished_after_s          | 15.2                        | 14.5       |
 +-------------------------------+-----------------------------+------------+
 Failed jobs in Horizon during the run: 0
 Session tokens or keys found in logs: 0
-Report: storage/app/workload/legacy-20261104-001543.json
+Report: storage/app/workload/legacy-20261104-004944.json

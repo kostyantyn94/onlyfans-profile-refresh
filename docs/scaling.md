@@ -12,14 +12,14 @@ account, 50 ms of upstream latency, 4 Horizon workers.
 | | |
 |---|---|
 | Throughput | **49 refreshes/s, ~12 per worker**, through the signed OnlyFans client (the first version, with the Fans API client, did 55/s) |
-| Time per refresh | ~82 ms: upstream call p50 57 ms (p95 112 ms), the rest our own work |
+| Time per refresh | ~82 ms: upstream call p50 56 ms (p95 111 ms), the rest our own work |
 | Our work per refresh | 8 SQL statements (5 reads, 3 writes; the write and its attempt row in one transaction) and a few Redis calls (gate, lock, Horizon, the cached signing rules and session) |
 | Worker memory | highest peak seen: 36.5 MB |
 
 `php artisan workload:scheduler-memory --profiles=30000` ([09](evidence/09-scheduler-memory.txt)):
-`profiles:enqueue-due` in its own process claims and dispatches **430–580 refreshes/s** in this run
-(650–700 in the first version's run; the machine was busier this time, and the throughput run above
-claimed its 3,000 at 896/s) and peaks at
+`profiles:enqueue-due` in its own process claims and dispatches **880–910 refreshes/s** in this run
+(650–700 in the first version's run, 430–580 in an earlier run of this version on a busier machine)
+and peaks at
 **30 MB** whether it queues 3,000 or 30,000, because it claims in batches of 500 and never builds
 models.
 
@@ -42,7 +42,7 @@ rate to size from and show where to look first.
 
 ## Likely bottleneck in this solution
 
-**The scheduler.** One process queues 430–900/s: about the 579/s average and below any peak. Every
+**The scheduler.** One process queues 430–910/s depending on the machine's load: about the 579/s average and below any peak. Every
 dispatch is one Redis round trip plus Horizon's bookkeeping plus a log line.
 
 Close behind it:

@@ -1,54 +1,54 @@
-Queued 40 + 10 refreshes with handler=v2 in 0.17 s. Waiting for Horizon...
+Queued 40 + 10 refreshes with handler=v2 in 0.13 s. Waiting for Horizon...
   t=  0s  busy: 40 waiting, oldest   0.5s,  0 ok  |  calm: 10 waiting, oldest   0.5s,  0 ok
-  t=  1s  busy: 40 waiting, oldest   1.5s,  0 ok  |  calm:  2 waiting, oldest   1.5s,  8 ok
+  t=  1s  busy: 40 waiting, oldest   1.5s,  0 ok  |  calm: 10 waiting, oldest   1.5s,  0 ok
   t=  2s  busy: 40 waiting, oldest   2.5s,  0 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
   t=  3s  busy: 40 waiting, oldest   3.5s,  0 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t=  4s  busy: 40 waiting, oldest   4.6s,  0 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t=  5s  busy: 40 waiting, oldest   5.6s,  0 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t=  6s  busy: 40 waiting, oldest   6.6s,  0 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t=  7s  busy: 40 waiting, oldest   7.6s,  0 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t=  8s  busy: 38 waiting, oldest   8.6s,  2 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t=  9s  busy: 35 waiting, oldest   9.6s,  5 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 10s  busy: 35 waiting, oldest  10.6s,  5 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 11s  busy: 30 waiting, oldest  11.6s, 10 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 12s  busy: 30 waiting, oldest  12.6s, 10 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 13s  busy: 29 waiting, oldest  13.6s, 11 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 14s  busy: 26 waiting, oldest  14.6s, 14 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 15s  busy: 26 waiting, oldest  15.6s, 14 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 16s  busy: 22 waiting, oldest  16.6s, 18 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 17s  busy: 21 waiting, oldest  17.6s, 19 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 18s  busy: 21 waiting, oldest  18.6s, 19 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 19s  busy: 14 waiting, oldest  19.6s, 26 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 20s  busy: 14 waiting, oldest  20.6s, 26 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 21s  busy: 14 waiting, oldest  21.4s, 26 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 22s  busy: 10 waiting, oldest  22.4s, 30 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 23s  busy: 10 waiting, oldest  23.4s, 30 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 24s  busy:  4 waiting, oldest  24.4s, 36 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 25s  busy:  4 waiting, oldest  25.4s, 36 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 26s  busy:  4 waiting, oldest  26.4s, 36 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 27s  busy:  4 waiting, oldest  27.4s, 36 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 28s  busy:  4 waiting, oldest  28.4s, 36 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 29s  busy:  2 waiting, oldest  29.4s, 38 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 30s  busy:  2 waiting, oldest  30.4s, 38 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t=  4s  busy: 40 waiting, oldest   4.5s,  0 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t=  5s  busy: 40 waiting, oldest   5.5s,  0 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t=  6s  busy: 39 waiting, oldest   6.5s,  1 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t=  7s  busy: 35 waiting, oldest   7.5s,  5 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t=  8s  busy: 35 waiting, oldest   8.5s,  5 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t=  9s  busy: 30 waiting, oldest   9.5s, 10 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 10s  busy: 30 waiting, oldest  10.5s, 10 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 11s  busy: 30 waiting, oldest  11.5s, 10 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 12s  busy: 26 waiting, oldest  12.5s, 14 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 13s  busy: 26 waiting, oldest  13.5s, 14 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 14s  busy: 21 waiting, oldest  14.5s, 19 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 15s  busy: 21 waiting, oldest  15.5s, 19 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 16s  busy: 21 waiting, oldest  16.5s, 19 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 17s  busy: 21 waiting, oldest  17.5s, 19 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 18s  busy: 21 waiting, oldest  18.5s, 19 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 19s  busy: 20 waiting, oldest  19.5s, 20 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 20s  busy: 12 waiting, oldest  20.6s, 28 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 21s  busy: 12 waiting, oldest  21.6s, 28 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 22s  busy: 12 waiting, oldest  22.6s, 28 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 23s  busy: 10 waiting, oldest  23.6s, 30 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 24s  busy:  5 waiting, oldest  24.6s, 35 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 25s  busy:  1 waiting, oldest  25.6s, 39 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 26s  busy:  1 waiting, oldest  26.6s, 39 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 27s  busy:  1 waiting, oldest  27.6s, 39 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 28s  busy:  1 waiting, oldest  28.3s, 39 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 29s  busy:  1 waiting, oldest  29.3s, 39 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 30s  busy:  1 waiting, oldest  30.3s, 39 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
 
 Handler: v2
-+-------------------------------+-----------------------------+------------+
-| metric                        | busy                        | calm       |
-+-------------------------------+-----------------------------+------------+
-| refreshes_queued              | 40                          | 10         |
-| refreshes_finished            | 40                          | 10         |
-| reported_successful           | 40                          | 10         |
-| verified_successful           | 40                          | 10         |
-| kept_last_valid_data          | 0                           | 0          |
-| wrong_data                    | 0                           | 0          |
-| failed_for_good               | 0                           | 0          |
-| upstream_requests             | 54                          | 10         |
-| upstream_statuses             | {"200":40,"429":10,"500":4} | {"200":10} |
-| attempts_recorded_by_app      | 54                          | 10         |
-| attempts_per_verified_success | 1.35                        | 1          |
-| max_oldest_wait_s             | 30.7                        | 1.5        |
-| all_finished_after_s          | 30.5                        | 1.4        |
-+-------------------------------+-----------------------------+------------+
++-------------------------------+----------------------------+------------+
+| metric                        | busy                       | calm       |
++-------------------------------+----------------------------+------------+
+| refreshes_queued              | 40                         | 10         |
+| refreshes_finished            | 40                         | 10         |
+| reported_successful           | 40                         | 10         |
+| verified_successful           | 40                         | 10         |
+| kept_last_valid_data          | 0                          | 0          |
+| wrong_data                    | 0                          | 0          |
+| failed_for_good               | 0                          | 0          |
+| upstream_requests             | 53                         | 10         |
+| upstream_statuses             | {"200":40,"429":8,"500":5} | {"200":10} |
+| attempts_recorded_by_app      | 53                         | 10         |
+| attempts_per_verified_success | 1.33                       | 1          |
+| max_oldest_wait_s             | 30.3                       | 2          |
+| all_finished_after_s          | 30.3                       | 1.9        |
++-------------------------------+----------------------------+------------+
 Failed jobs in Horizon during the run: 0
 Session tokens or keys found in logs: 0
-Report: storage/app/workload/v2-20261104-001637.json
+Report: storage/app/workload/v2-20261104-005021.json

@@ -15,8 +15,10 @@ run() { docker compose exec -T app php artisan "$@" --no-ansi; }
 { echo "# REFRESH_HANDLER=legacy php artisan test --group=incident (old handler, current commit)"; echo; docker compose exec -T -e REFRESH_HANDLER=legacy app php artisan test --group=incident --colors=never || true; } > docs/evidence/01b-incident-tests-legacy-now.txt 2>&1
 { echo "# php artisan test --group=incident (fixed handler)"; echo; run test --group=incident --colors=never; } > docs/evidence/02-incident-tests-after-fix.txt 2>&1
 
-# The scheduler container would claim workload rows too; keep it out of the measurements.
+# The scheduler container would claim workload rows too; keep it out of the measurements
+# (and start it again however this script ends). Run nothing else that starts it meanwhile.
 docker compose stop scheduler
+trap 'docker compose start scheduler >/dev/null 2>&1' EXIT
 
 SINCE=$(date -u +"%Y-%m-%d %H:%M:%S")
 run workload:run --handler=legacy > docs/evidence/03-workload-before-fix-legacy.txt 2>&1
@@ -28,7 +30,8 @@ run workload:run --handler=v2 > docs/evidence/04-workload-after-fix-v2.txt 2>&1
 cp "$(ls -t storage/app/workload/v2-*.json | head -1)" docs/evidence/04-workload-after-fix-v2.json
 
 # The fake upstream switches to new signing rules 4 s in, as OnlyFans does with a release.
-{ echo "\$ php artisan workload:run --handler=v2 --rotate-rules=4"; run workload:run --handler=v2 --rotate-rules=4; echo; echo "# signing events in storage/logs/refresh.log during the run:"; grep -h '"onlyfans\.' storage/logs/refresh.log | tail -n 3; } > docs/evidence/13-workload-rules-rotation.txt 2>&1
+OFFSET=$(wc -c < storage/logs/refresh.log)
+{ echo "\$ php artisan workload:run --handler=v2 --rotate-rules=4"; run workload:run --handler=v2 --rotate-rules=4; echo; echo "# signing events in storage/logs/refresh.log during the run:"; tail -c +$((OFFSET + 1)) storage/logs/refresh.log | grep '"onlyfans\.'; } > docs/evidence/13-workload-rules-rotation.txt 2>&1
 cp "$(ls -t storage/app/workload/v2-*.json | head -1)" docs/evidence/13-workload-rules-rotation.json
 
 run workload:crash --at=after-write > docs/evidence/05-crash-after-write.txt 2>&1

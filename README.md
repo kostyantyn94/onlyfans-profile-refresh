@@ -9,8 +9,8 @@ fresh. The incident from the task is reproduced, fixed and measured.
 |---|---|---|
 | Refreshes the workers reported as successful | 50 of 50 | 50 of 50 |
 | Refreshes with **correct stored data** | 26 of 50 (24 have likes = 0) | **50 of 50** |
-| Busy account: upstream requests per correct refresh | 3.24 | 1.35 |
-| Calm account: oldest waiting refresh | 15.5 s (stuck behind the busy account) | 1.5 s |
+| Busy account: upstream requests per correct refresh | 3.05 | 1.33 |
+| Calm account: oldest waiting refresh | 15.0 s (stuck behind the busy account) | 2.0 s |
 
 After the old handler's run, `profiles:repair` and the fixed handler brought all 50 profiles back
 to correct data ([03b](docs/evidence/03b-repair-after-legacy.txt)).
@@ -131,11 +131,25 @@ replaced when the credential changes or removed with it.
 
 **Likes are `favoritedCount`.** OnlyFans returns no revision, so the time the request was sent (ms)
 is the revision: of two answers for one profile, the one requested later carries the newer data.
-Stored: the main fields as columns and the **whole user object** as `jsonb` in `profiles.raw`.
+Stored: the main fields as columns and the **whole user object (85 fields)** as `jsonb` in
+`profiles.raw`; the captured response is a fixture,
+[`onlyfans-madison420ivy.json`](resources/fixtures/upstream/onlyfans-madison420ivy.json).
+
+Live, through the job path, in the CLI and then through Horizon
+([14](docs/evidence/14-live-onlyfans-fetch.txt), run on 4 Nov at `d5b38fc`; later commits change only docs and evidence scripts):
 
 ```text
-$ php artisan profiles:fetch madison420ivy          (live, 14-live-onlyfans-fetch.txt)
-LIVE_FETCH_OUTPUT
+$ php artisan profiles:fetch madison420ivy
+| name                    | Madison Ivy                          |
+| upstream id             | 5140520                              |
+| likes                   | 612,018                              |
+| posts / photos / videos | 178 / 623 / 202                      |
+| revision                | 1793752997258                        |   (the request time, ms)
+| fields stored (raw)     | 85                                   |
+| next refresh            | 2026-11-05 00:43:17                  |   (above 100,000 likes: every 24 h)
+| this attempt            | success, HTTP 200, 367 ms            |
+
+$ php artisan profiles:fetch madison420ivy --queue      → success, HTTP 200, 256 ms (Horizon worker)
 ```
 
 **Fans API** (`--account=fansapi`, driver `fansapi`) is still there for comparison: the first
@@ -292,11 +306,11 @@ Results, both runs from one `run-all.sh` pass ([03](docs/evidence/03-workload-be
 | Reported successful | 40 | 10 | 40 | 10 |
 | **Stored data correct** (121,000 / rev 11) | **21** | **5** | **40** | **10** |
 | Stored data wrong (likes 0) | 19 | 5 | 0 | 0 |
-| Upstream requests (counted by the fake upstream) | 68 | 10 | 54 | 10 |
-| **Requests per correct refresh** | **3.24** | **2.0** | **1.35** | **1.0** |
-| Upstream answers | 38×200, 26×429, 4×500 | 10×200 | 40×200, 10×429, 4×500 | 10×200 |
-| **Oldest waiting refresh (max)** | 16.2 s | **15.5 s** | 30.7 s | **1.5 s** |
-| All finished after | 15.7 s | 15.0 s | 30.5 s | 1.4 s |
+| Upstream requests (counted by the fake upstream) | 64 | 10 | 53 | 10 |
+| **Requests per correct refresh** | **3.05** | **2.0** | **1.33** | **1.0** |
+| Upstream answers | 38×200, 22×429, 4×500 | 10×200 | 40×200, 8×429, 5×500 | 10×200 |
+| **Oldest waiting refresh (max)** | 15.8 s | **15.0 s** | 30.3 s | **2.0 s** |
+| All finished after | 15.2 s | 14.5 s | 30.3 s | 1.9 s |
 | Session tokens or keys in logs | 0 | 0 | 0 | 0 |
 
 - **Old:** everything "succeeds" and about half the data is wrong. The calm account cannot start
@@ -315,8 +329,8 @@ Results, both runs from one `run-all.sh` pass ([03](docs/evidence/03-workload-be
 the same 40 + 10 workload, with the fake upstream switching to new signing rules 4 s in, as OnlyFans
 does with a release. One request was rejected ("Please refresh the page"); that worker dropped the
 cached rules and its session, the next load got the new rules (fingerprint `aa2a8f26…` →
-`ea4fdcf9…`) and every worker used them from then on. Result: 50 of 50 correct, 55 + 10 requests,
-the calm account's oldest wait 1.3 s, 0 failed jobs.
+`ea4fdcf9…`) and every worker used them from then on. Result: 50 of 50 correct, 54 + 10 requests,
+the calm account's oldest wait 2.4 s, 0 failed jobs.
 
 ## Worker crash
 
@@ -386,8 +400,8 @@ profiles ([09](docs/evidence/09-scheduler-memory.txt)). Bodies over 1 MB are ref
 ## The next scaling limit
 
 Full write-up: [docs/scaling.md](docs/scaling.md). In short: one machine did **49 refreshes/s with 4
-workers** through the signed client (upstream call p50 57 ms), and the scheduler queues **430–900/s**
-per process depending on how busy the machine is ([07](docs/evidence/07-throughput.txt),
+workers** through the signed client (upstream call p50 56 ms), and the scheduler queues **830–910/s**
+per process (430–580 in an earlier run on a busier machine) ([07](docs/evidence/07-throughput.txt),
 [09](docs/evidence/09-scheduler-memory.txt)). At 579/s on average, the **scheduler is the first
 thing to break**: it barely matches the average and is below any peak. Next come Postgres writes
 (3 per refresh, plus `refresh_attempts` at ≥ 50 M rows/day) and, outside our control, OnlyFans' own
@@ -475,7 +489,8 @@ Claude Code working as an agent; see [AI.md](AI.md).
 | *Second session:* second independent review and its fixes, live stale-cache check, UI redesign (a parallel agent), merge, final evidence, clean-setup check, packaging | 0:54 |
 | **First submission** (1 Nov, 20:20–22:20 and 22:28–23:22) | **2:54** |
 | *Afterwards (2 Nov, 00:00–00:30):* read-only public demo mode, hosting it through Tailscale Funnel | 0:30 |
-| *After the review (4 Nov):* REVIEW_ROW | REVIEW_TIME |
+| *After the review (4 Nov, 01:40–03:05):* direct signed OnlyFans client (signing, rules, sessions), the three fixes with regression tests, live probes and the live check, fake upstream with signature checks and rules rotation, a third independent review and its fixes, evidence, docs, packaging | 1:25 |
+| **Total, both rounds** (the public demo not counted) | **4:19** |
 
 ## Layout
 

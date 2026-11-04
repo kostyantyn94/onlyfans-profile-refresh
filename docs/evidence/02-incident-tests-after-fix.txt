@@ -2,14 +2,14 @@
 
 
    PASS  Tests\Feature\IncidentRegressionTest
-  ✓ old format is still accepted                                         0.40s  
-  ✓ new format with likes inside profile is stored                       0.08s  
-  ✓ rate limit without retry after keeps data and is retried later       0.12s  
+  ✓ old format is still accepted                                         0.45s  
+  ✓ new format with likes inside profile is stored                       0.09s  
+  ✓ rate limit without retry after keeps data and is retried later       0.11s  
   ✓ server error with empty body keeps data and is retried later         0.09s  
-  ✓ missing likes is invalid not zero                                    0.10s  
-  ✓ an older revision arriving last does not overwrite newer data        0.10s  
-  ✓ the same job delivered twice neither duplicates nor corrupts         0.16s  
+  ✓ missing likes is invalid not zero                                    0.13s  
+  ✓ an older revision arriving last does not overwrite newer data        0.12s  
+  ✓ the same job delivered twice neither duplicates nor corrupts         0.22s  
 
   Tests:    7 passed (29 assertions)
-  Duration: 1.13s
+  Duration: 1.31s
 

@@ -21,7 +21,12 @@
 
 ## What was checked, and how
 
-- **Live data**: a real `GET /api/profiles/madison420ivy` through the full job path, then through
+- **Live data from onlyfans.com** (second round): signed guest requests for madison420ivy through
+  the full job path, in the CLI and through Horizon, both HTTP 200 and 612,018 likes, the stored row
+  checked against the 85-field response ([14](docs/evidence/14-live-onlyfans-fetch.txt)). The
+  signature is also checked against fixed values computed separately in Python, and the fake
+  upstream verifies it with its own implementation on every workload request.
+- **Live data (first version, Fans API)**: a real `GET /api/profiles/madison420ivy` through the full job path, then through
   Horizon; the stored row compared with the raw response (87 fields). Later a live run showed the
   stale-cache rule working: Fans API's cache was 12 h old (611,905 likes), the job asked again with
   `?fresh=true` and stored 611,954 ([11](docs/evidence/11-live-fresh-fetch.txt), 1 credit).

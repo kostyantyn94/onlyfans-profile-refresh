@@ -1,59 +1,55 @@
 $ php artisan workload:run --handler=v2 --rotate-rules=4
-Queued 40 + 10 refreshes with handler=v2 in 0.14 s. Waiting for Horizon...
-  t=  0s  busy: 40 waiting, oldest   0.6s,  0 ok  |  calm: 10 waiting, oldest   0.6s,  0 ok
-  t=  1s  busy: 40 waiting, oldest   1.6s,  0 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t=  2s  busy: 40 waiting, oldest   2.6s,  0 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t=  3s  busy: 40 waiting, oldest   3.6s,  0 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t=  4s  busy: 40 waiting, oldest   4.6s,  0 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t=  5s  busy: 40 waiting, oldest   5.6s,  0 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t=  6s  busy: 40 waiting, oldest   6.6s,  0 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t=  7s  busy: 40 waiting, oldest   7.6s,  0 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t=  8s  busy: 33 waiting, oldest   8.6s,  7 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t=  9s  busy: 33 waiting, oldest   9.6s,  7 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 10s  busy: 33 waiting, oldest  10.6s,  7 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 11s  busy: 28 waiting, oldest  11.6s, 12 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 12s  busy: 28 waiting, oldest  12.6s, 12 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 13s  busy: 24 waiting, oldest  13.7s, 16 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 14s  busy: 24 waiting, oldest  14.7s, 16 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 15s  busy: 24 waiting, oldest  15.7s, 16 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 16s  busy: 24 waiting, oldest  16.7s, 16 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 17s  busy: 15 waiting, oldest  17.7s, 25 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 18s  busy: 15 waiting, oldest  18.7s, 25 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 19s  busy: 14 waiting, oldest  19.7s, 26 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 20s  busy: 11 waiting, oldest  20.7s, 29 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 21s  busy: 11 waiting, oldest  21.7s, 29 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 22s  busy: 11 waiting, oldest  22.7s, 29 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 23s  busy:  9 waiting, oldest  23.7s, 31 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 24s  busy:  4 waiting, oldest  24.7s, 36 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 25s  busy:  4 waiting, oldest  25.7s, 36 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 26s  busy:  4 waiting, oldest  26.7s, 36 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 27s  busy:  3 waiting, oldest  27.5s, 37 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 28s  busy:  1 waiting, oldest  28.5s, 39 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 29s  busy:  1 waiting, oldest  29.5s, 39 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+Queued 40 + 10 refreshes with handler=v2 in 0.33 s. Waiting for Horizon...
+  t=  0s  busy: 40 waiting, oldest   0.7s,  0 ok  |  calm: 10 waiting, oldest   0.7s,  0 ok
+  t=  1s  busy: 40 waiting, oldest   1.4s,  0 ok  |  calm: 10 waiting, oldest   1.4s,  0 ok
+  t=  2s  busy: 40 waiting, oldest   2.4s,  0 ok  |  calm:  2 waiting, oldest   2.4s,  8 ok
+  t=  3s  busy: 40 waiting, oldest   3.4s,  0 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t=  4s  busy: 40 waiting, oldest   4.4s,  0 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t=  5s  busy: 40 waiting, oldest   5.4s,  0 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t=  6s  busy: 40 waiting, oldest   6.4s,  0 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t=  7s  busy: 33 waiting, oldest   7.5s,  7 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t=  8s  busy: 33 waiting, oldest   8.5s,  7 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t=  9s  busy: 33 waiting, oldest   9.5s,  7 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 10s  busy: 28 waiting, oldest  10.5s, 12 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 11s  busy: 28 waiting, oldest  11.5s, 12 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 12s  busy: 23 waiting, oldest  12.5s, 17 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 13s  busy: 23 waiting, oldest  13.5s, 17 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 14s  busy: 23 waiting, oldest  14.5s, 17 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 15s  busy: 19 waiting, oldest  15.5s, 21 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 16s  busy: 19 waiting, oldest  16.5s, 21 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 17s  busy: 14 waiting, oldest  17.5s, 26 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 18s  busy: 14 waiting, oldest  18.5s, 26 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 19s  busy: 14 waiting, oldest  19.5s, 26 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 20s  busy: 10 waiting, oldest  20.5s, 30 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 21s  busy:  3 waiting, oldest  21.5s, 37 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 22s  busy:  3 waiting, oldest  22.5s, 37 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 23s  busy:  2 waiting, oldest  23.5s, 38 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 24s  busy:  2 waiting, oldest  24.5s, 38 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 25s  busy:  1 waiting, oldest  25.5s, 39 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
 
 Handler: v2
-+-------------------------------+-------------------------------------+------------+
-| metric                        | busy                                | calm       |
-+-------------------------------+-------------------------------------+------------+
-| refreshes_queued              | 40                                  | 10         |
-| refreshes_finished            | 40                                  | 10         |
-| reported_successful           | 40                                  | 10         |
-| verified_successful           | 40                                  | 10         |
-| kept_last_valid_data          | 0                                   | 0          |
-| wrong_data                    | 0                                   | 0          |
-| failed_for_good               | 0                                   | 0          |
-| upstream_requests             | 55                                  | 10         |
-| upstream_statuses             | {"200":40,"400":1,"429":10,"500":4} | {"200":10} |
-| attempts_recorded_by_app      | 55                                  | 10         |
-| attempts_per_verified_success | 1.38                                | 1          |
-| max_oldest_wait_s             | 30                                  | 1.3        |
-| all_finished_after_s          | 29.8                                | 1.1        |
-+-------------------------------+-------------------------------------+------------+
++-------------------------------+------------------------------------+------------+
+| metric                        | busy                               | calm       |
++-------------------------------+------------------------------------+------------+
+| refreshes_queued              | 40                                 | 10         |
+| refreshes_finished            | 40                                 | 10         |
+| reported_successful           | 40                                 | 10         |
+| verified_successful           | 40                                 | 10         |
+| kept_last_valid_data          | 0                                  | 0          |
+| wrong_data                    | 0                                  | 0          |
+| failed_for_good               | 0                                  | 0          |
+| upstream_requests             | 54                                 | 10         |
+| upstream_statuses             | {"200":40,"400":1,"429":9,"500":4} | {"200":10} |
+| attempts_recorded_by_app      | 54                                 | 10         |
+| attempts_per_verified_success | 1.35                               | 1          |
+| max_oldest_wait_s             | 25.5                               | 2.4        |
+| all_finished_after_s          | 25.4                               | 2.3        |
++-------------------------------+------------------------------------+------------+
 Failed jobs in Horizon during the run: 0
 Session tokens or keys found in logs: 0
-Report: storage/app/workload/v2-20261104-001708.json
+Report: storage/app/workload/v2-20261104-005052.json
 
 # signing events in storage/logs/refresh.log during the run:
-{"message":"onlyfans.rules_loaded","context":{"host":"fake-upstream","rules_source":"http://fake-upstream:8080/rules.json","rules":"aa2a8f263e64"},"level":200,"level_name":"INFO","channel":"local","datetime":"2026-11-04T00:17:08.803518+00:00","extra":{}}
-{"message":"onlyfans.signature_rejected","context":{"host":"fake-upstream","rules_source":"http://fake-upstream:8080/rules.json","rules":"aa2a8f263e64","rejections":1,"skipped":false},"level":300,"level_name":"WARNING","channel":"local","datetime":"2026-11-04T00:17:13.655378+00:00","extra":{}}
-{"message":"onlyfans.rules_loaded","context":{"host":"fake-upstream","rules_source":"http://fake-upstream:8080/rules.json","rules":"ea4fdcf9fa3d"},"level":200,"level_name":"INFO","channel":"local","datetime":"2026-11-04T00:17:13.671587+00:00","extra":{}}
+{"message":"onlyfans.rules_loaded","context":{"host":"fake-upstream","rules_source":"http://fake-upstream:8080/rules.json","rules":"aa2a8f263e64"},"level":200,"level_name":"INFO","channel":"local","datetime":"2026-11-04T00:50:53.471057+00:00","extra":{}}
+{"message":"onlyfans.signature_rejected","context":{"host":"fake-upstream","rules_source":"http://fake-upstream:8080/rules.json","rules":"aa2a8f263e64","sessions_rejected":1,"skipped":false,"onlyfans_rev":null},"level":300,"level_name":"WARNING","channel":"local","datetime":"2026-11-04T00:50:56.552196+00:00","extra":{}}
+{"message":"onlyfans.rules_loaded","context":{"host":"fake-upstream","rules_source":"http://fake-upstream:8080/rules.json","rules":"ea4fdcf9fa3d"},"level":200,"level_name":"INFO","channel":"local","datetime":"2026-11-04T00:50:56.569862+00:00","extra":{}}

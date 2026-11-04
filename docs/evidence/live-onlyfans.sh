@@ -41,8 +41,8 @@ trap 'docker compose start scheduler >/dev/null 2>&1' EXIT
               (select count(*) from jsonb_object_keys(p.raw)) as raw_fields, p.last_attempt_status, p.next_refresh_at
          from profiles p join accounts c on c.id = p.account_id
         where c.slug = 'onlyfans' and p.username = 'madison420ivy'"
-  echo '# signing and refresh events in storage/logs/refresh.log during this run (secrets are never logged):'
-  tail -c +$((LOG_OFFSET + 1)) storage/logs/refresh.log | grep -E '"(onlyfans\.|refresh\.(success|unchanged|failed|retry_scheduled))' | cut -c1-400
+  echo '# signing and refresh events of the onlyfans account in storage/logs/refresh.log during this run (secrets are never logged):'
+  tail -c +$((LOG_OFFSET + 1)) storage/logs/refresh.log | grep -E '"(account":"onlyfans"|host":"onlyfans\.com")' | cut -c1-400
 } > "$OUT" 2>&1
 
 # The stored user object doubles as the test fixture, unless a captured response is already there.

@@ -1,0 +1,51 @@
+# Live: signed guest requests to onlyfans.com/api2/v2/users/madison420ivy.
+# Commit: d5b38fc Fixes from the third independent review; real OnlyFans fixture and probes   Run: 2026-11-04T00:43Z
+
+$ php artisan db:seed --force
+
+   INFO  Seeding database.  
+
+
+$ php artisan profiles:fetch madison420ivy          # first attempt in this process
++-------------------------+--------------------------------------+
+| Field                   | Value                                |
++-------------------------+--------------------------------------+
+| username                | madison420ivy                        |
+| name                    | Madison Ivy                          |
+| upstream id             | 5140520                              |
+| likes                   | 612,018                              |
+| posts / photos / videos | 178 / 623 / 202                      |
+| verified                | true                                 |
+| subscribe price         | 0.00                                 |
+| joined                  | 2018-11-11                           |
+| revision                | 1793752997258                        |
+| fields stored (raw)     | 85                                   |
+| last attempt            | success at 2026-11-04 00:43:17       |
+| last success            | 2026-11-04 00:43:17                  |
+| last failure            | -                                    |
+| next refresh            | 2026-11-05 00:43:17                  |
+| this attempt            | success, HTTP 200, 367 ms            |
+| refresh id              | ae53bfac-441b-4ff3-9a2d-3039bf9fe984 |
++-------------------------+--------------------------------------+
+
+$ php artisan profiles:fetch madison420ivy --queue  # the same through Horizon
+Queued refresh f6fa82cc-16e9-4a4d-88b2-b411a3342964 for madison420ivy. Follow it: grep f6fa82cc-16e9-4a4d-88b2-b411a3342964 storage/logs/refresh.log
+
+# refresh_attempts of the onlyfans account (newest first):
+     created_at      | handler | outcome | http_status | likes  | duration_ms 
+---------------------+---------+---------+-------------+--------+-------------
+ 2026-11-04 00:43:19 | v2      | success |         200 | 612018 |         256
+ 2026-11-04 00:43:17 | v2      | success |         200 | 612018 |         367
+(2 rows)
+
+# stored profile:
+   username    | upstream_id |    name     | likes_count | posts_count | photos_count | videos_count | raw_fields | last_attempt_status |   next_refresh_at   
+---------------+-------------+-------------+-------------+-------------+--------------+--------------+------------+---------------------+---------------------
+ madison420ivy |     5140520 | Madison Ivy |      612018 |         178 |          623 |          202 |         85 | success             | 2026-11-05 00:43:19
+(1 row)
+
+# signing and refresh events of the onlyfans account in storage/logs/refresh.log during this run (secrets are never logged;
+# lines of a workload that ran at the same time are filtered out):
+{"message":"onlyfans.rules_loaded","context":{"host":"onlyfans.com","rules_source":"https://raw.githubusercontent.com/rafa-9/dynamic-rules/main/rules.json","rules":"b03e942a1e4d"},"level":200,"level_name":"INFO","channel":"local","datetime":"2026-11-04T00:43:17.249824+00:00","extra":{}}
+{"message":"refresh.success","context":{"refresh_id":"ae53bfac-441b-4ff3-9a2d-3039bf9fe984","account_id":32,"account":"onlyfans","profile_id":66461,"username":"madison420ivy","job_id":"","job_attempt":1,"upstream_attempt":1,"outcome":"success","http_status":200,"format":"onlyfans","revision":1793752997258,"likes":612018,"duration_ms":367,"memory_peak_mb":36.5},"level":200,"level_name":"INFO","chan
+{"message":"refresh.success","context":{"refresh_id":"f6fa82cc-16e9-4a4d-88b2-b411a3342964","account_id":32,"account":"onlyfans","profile_id":66461,"username":"madison420ivy","job_id":"47f72b68-820d-4c7f-986a-dd2e70111bca","job_attempt":1,"upstream_attempt":1,"outcome":"success","http_status":200,"format":"onlyfans","revision":1793752998682,"likes":612018,"duration_ms":256,"memory_peak_mb":36.5},"

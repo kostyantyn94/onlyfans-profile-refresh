@@ -1,5 +1,5 @@
-Refresh 51b54fde-8cd6-4593-bc19-79613e03ddfe queued; the worker that picks it up will be killed after-write.
-Worker killed after 1.8 s. Profile now: likes=121000 revision=11, claim released, attempts recorded: 1, jobs reserved in Redis: 1.
+Refresh 929074a1-a0ae-4bbc-b990-f8f5f95131fe queued; the worker that picks it up will be killed after-write.
+Worker killed after 1.0 s. Profile now: likes=121000 revision=11, claim released, attempts recorded: 1, jobs reserved in Redis: 1.
 Waiting for Redis to hand the job out again (retry_after = 90 s)...
 +------------------------------------------+-----------------------------------------------------+
 | check                                    | result                                              |
