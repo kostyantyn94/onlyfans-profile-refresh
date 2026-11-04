@@ -25,8 +25,8 @@
 ## What was checked, and how
 
 - **Live data from onlyfans.com**: signed guest requests for madison420ivy through the full job
-  path, in the CLI and through Horizon, both HTTP 200 and 612,018 likes, the stored row checked
-  against the 85-field response ([14](docs/evidence/14-live-onlyfans-fetch.txt)). The signature is
+  path, in the CLI and through Horizon, signed with the rules read from OnlyFans' web app, both
+  HTTP 200 and 612,019 likes, the stored row checked against the 85-field response ([14](docs/evidence/14-live-onlyfans-fetch.txt)). The signature is
   also checked against fixed values computed separately in Python, and the fake upstream verifies it
   with its own implementation on every workload request.
 - **The signing rules read from OnlyFans' own code**: the extractor's output for the live release

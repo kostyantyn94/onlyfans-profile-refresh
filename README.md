@@ -10,10 +10,10 @@ fixed and measured.
 $ php artisan profiles:fetch madison420ivy                (live, 4 Nov: docs/evidence/14)
 | name                    | Madison Ivy                          |
 | upstream id             | 5140520                              |
-| likes                   | 612,018                              |
+| likes                   | 612,019                              |
 | posts / photos / videos | 178 / 623 / 202                      |
 | fields stored (raw)     | 85                                   |
-| this attempt            | success, HTTP 200, 367 ms            |
+| this attempt            | success, HTTP 200, 248 ms            |
 ```
 
 **How the request is made** (details: [docs/signing.md](docs/signing.md)):
@@ -138,7 +138,7 @@ is the revision: of two answers for one profile, the one requested later carries
 Stored: the main fields as columns and the **whole user object (85 fields)** as `jsonb` in
 `profiles.raw`; the captured response is a fixture,
 [`onlyfans-madison420ivy.json`](resources/fixtures/upstream/onlyfans-madison420ivy.json). The same
-fetch through Horizon: `profiles:fetch madison420ivy --queue` → success, HTTP 200, 256 ms
+fetch through Horizon: `profiles:fetch madison420ivy --queue` → success, HTTP 200, 257 ms
 ([14](docs/evidence/14-live-onlyfans-fetch.txt)).
 
 ## The failure
@@ -524,7 +524,8 @@ Claude Code working as an agent; see [AI.md](AI.md).
 | **First submission** (1 Nov, 20:20–22:20 and 22:28–23:22) | **2:54** |
 | *Afterwards (2 Nov, 00:00–00:30):* read-only public demo mode, hosting it through Tailscale Funnel | 0:30 |
 | *After the review (4 Nov, 01:40–03:05):* direct signed OnlyFans client (signing, rules, sessions), the three fixes with regression tests, live probes and the live check, fake upstream with signature checks and rules rotation, a third independent review and its fixes, evidence, docs, packaging | 1:25 |
-| **Total, both rounds** (the public demo not counted) | **4:19** |
+| *Then (4 Nov, 03:10–06:20):* the signing rules read from OnlyFans' own web app code (extractor, synthetic web app and its Node check, live extraction and probe), the fourth and fifth independent reviews (five reviewers) and their fixes, evidence re-recorded at the final code, clean-setup check, docs, packaging | 3:10 |
+| **Total, both rounds** (the public demo not counted) | **7:29** |
 
 ## Layout
 
