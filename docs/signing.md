@@ -120,20 +120,24 @@ host in the cache, shared by all workers.
   - A job waits at most 2 s for another worker's load. After that it is deferred for 3 s without
     spending an attempt.
   - One load is capped at 12 s, so a job stays inside its 30 s timeout.
+- **Kept until replaced.** The cached rules have no expiry of their own: however long the sources
+  fail, the last good copy stays in use.
 - **A new release.** Every OnlyFans response names the current release (`x-of-rev`). One newer than
-  the release the rules were read from marks them for reloading at once, so a new release is picked
-  up on the first response that shows it.
+  the cached rules' release marks them for reloading at once, once per release: if the page still
+  serves the old release for a while (a CDN lagging), the following responses do not reload again.
 - **A rejected signature does not prove the rules are wrong**, because the session can be the cause.
-  - The rules are marked for reloading by one worker, at most once per 5 s. The guest session is
-    dropped, and the refresh retries from 5 s.
-  - What is counted against the rules is the *sessions* rejected with them, kept as a Redis set of
-    hashed `x-bc` tokens in a fixed 30-minute window. Two requests in flight on one bad session
-    count once.
+  - The rules are marked for reloading, but only if they were loaded before the rejected request
+    was sent: requests already in flight that are rejected late do not reload again. The guest
+    session is dropped, and the refresh retries from 5 s.
+  - What is counted against the rules is the *sessions* rejected with them (per release), kept as
+    a Redis set of hashed `x-bc` tokens in a fixed 30-minute window. Two requests in flight on one
+    bad session count once.
   - Rules OnlyFans accepted in the last 10 minutes are not counted against at all: then it is the
     sessions that are refused.
-  - Rules rejected for two different sessions are skipped for the rest of the window, and the next
-    source is used. With no other source, nothing is sent (`rules_unavailable`, retried within the
-    attempt budget) rather than collecting more rejections.
+  - Rules rejected for two different sessions give way to the next source for the rest of the
+    window, if one is configured. The last source with valid rules is never skipped: sending
+    nothing would stop every refresh, with no request left to prove the rules good again. Each
+    refresh is still bounded by its 3 `signature_rejected` tries.
 - `php artisan onlyfans:rules [--reload]` shows the rules in use, their source and release. With
   `--reload` it loads them from the sources first, without dropping the cached copy.
 

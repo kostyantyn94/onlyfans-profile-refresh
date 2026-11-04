@@ -18,8 +18,7 @@ account, 50 ms of upstream latency, 4 Horizon workers.
 
 `php artisan workload:scheduler-memory --profiles=30000` ([09](evidence/09-scheduler-memory.txt)):
 `profiles:enqueue-due` in its own process claims and dispatches **800–950 refreshes/s** in this
-run (430–580 in an earlier run on a busier machine) and peaks at **30 MB** whether it queues 3,000
-or 30,000, because it claims in batches of 500 and never builds models.
+run and peaks at **30 MB** whether it queues 3,000 or 30,000, because it claims in batches of 500 and never builds models.
 
 A few thousand local jobs are not evidence that this handles 50 M/day; they give a per-worker
 rate to size from and show where to look first.
@@ -30,7 +29,7 @@ rate to size from and show where to look first.
 |---|---|
 | Peak arrivals | refreshes queued per second, in total and per account; how much the 24 h / 72 h schedule bunches up (profiles added together come due together) |
 | Job duration | p50/p95/p99 of the upstream call and of our own time, per account |
-| Concurrent work | in-flight jobs = arrival rate × duration (Little's law): 579/s × 83 ms ≈ 48 busy workers on average; several times that at peak or when the upstream slows to seconds |
+| Concurrent work | in-flight jobs = arrival rate × duration (Little's law). With the fake upstream's 83 ms: 579/s × 0.083 s ≈ 48 busy workers. With live OnlyFans calls (256–367 ms in [14](evidence/14-live-onlyfans-fetch.txt)): 579/s × ~0.35 s ≈ 200 busy workers on average, as many database connections (a pooler such as PgBouncer in front of Postgres), several times that at peak or when the upstream slows to seconds |
 | Retry amplification | upstream requests per successful refresh, by outcome: 429s, 5xx, `signature_rejected` after each OnlyFans release (and, with the Fans API driver, the `?fresh=true` follow-ups) |
 | Database | statements/s (≈ 9 × 579 ≈ 5.2 k/s on average, 2.3 k of them writes), WAL volume, lock waits on `profiles`, growth of `refresh_attempts` (≥ 50 M rows/day) |
 | Redis | ops/s, memory used by Horizon's job metadata, size of the delayed set, how many pops end in a deferral |
@@ -49,8 +48,8 @@ account from one IP, so OnlyFans' limits, not ours, would stop it first. What ex
 pauses the whole account, an account's concurrency is capped, guest sessions are created on demand,
 and rejections are tracked per session.
 
-**Inside our system: the scheduler.** One process queues 800–950/s (430–580 on a busier
-machine): about the 579/s average and below any peak. Every dispatch is one Redis round trip plus
+**Inside our system: the scheduler.** One process queues 800–950/s: above the 579/s average,
+but not by much, and below a peak of a few times that. Every dispatch is one Redis round trip plus
 Horizon's bookkeeping plus a log line.
 
 Close behind it:

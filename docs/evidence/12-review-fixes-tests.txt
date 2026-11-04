@@ -1,7 +1,9 @@
 # Regression tests for the three reliability gaps from the review (4 Nov 2026).
 # Recorded when the fixes were made, before the OnlyFans client was added (commit a6d086d has both);
 # output filtered to the test lines. The full suite at the final commit is 08 (it also has a later
-# test for a ?fresh=true answer marked is_cached=false but taken long ago).
+# test for a ?fresh=true answer marked is_cached=false but taken long ago). The commit-together test
+# was strengthened later: the attempt row is now written before the request, so it asserts that
+# row stays in_flight (counted) and nothing else is written; this file shows its version at a6d086d.
 # 1) Before the fix: app/ and config/ stashed, the new tests run against the reviewed code.
 $ git stash push -- app config && php artisan test --filter='fresh_request_that_still|exceed_the_attempt_budget|no_attempts_left|commit_together'
   ⨯ a fresh request that still returns an old snapshot is not stored     0.40s  

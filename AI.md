@@ -8,9 +8,10 @@
   evidence. Commits carry a `Co-Authored-By` line for that reason.
 - Further Claude Code agents did **independent reviews** of the finished code, with no access to
   how it was written (prompt: find correctness bugs, unsupported claims, missing requirements,
-  vacuous tests). There were two for the first submission and two rounds after your review; the last
-  round had three reviewers in parallel: the refresh path, the signing code, and the whole submission
-  read as a hiring reviewer would. Their findings and what was done with them are below.
+  vacuous tests). There were two for the first submission and three rounds after your review. The
+  fourth round had three reviewers in parallel (the refresh path, the signing code, and the whole
+  submission read as a hiring reviewer would), the fifth two, of the code and documents after it.
+  Their findings and what was done with them are below.
 - A further agent redesigned the UI in a separate git worktree (Blade and plain CSS, no build step);
   I merged and checked it.
 - My part: setting the constraints (time box, English-only deliverables, no keys in git, ask
@@ -47,11 +48,12 @@
   "job completed".
 - **Worker crash**: a real `SIGKILL` of a Horizon worker, after and before the database write,
   waiting for the real `retry_after` redelivery.
-- **Secrets**: a test and every workload run search the logs for the API keys and session tokens (0
-  found); a pre-commit hook refuses `.env` and anything that looks like an `ofapi_` key. The
+- **Secrets**: a test and every workload run search the logs for the API keys and every session
+  token the fake upstream saw (0 found); a local pre-commit hook (not part of the repository)
+  refuses `.env` and anything that looks like an `ofapi_` key. The
   submission ZIP is built from a fresh clone, so the local `.env` with the key is not in it.
-- **Clean setup**: a fresh clone in an empty folder, `setup.sh`, then the test suite and a keyless
-  fetch: [10](docs/evidence/10-clean-setup.txt) (first version).
+- **Clean setup**: a fresh clone in an empty folder at the final code, `setup.sh`, then the test
+  suite, the rules read from OnlyFans' web app and the UI: [10](docs/evidence/10-clean-setup.txt).
 
 ## Incorrect suggestions and mistakes caught
 
@@ -107,10 +109,9 @@ Mistakes caught in this round:
   the same old snapshot and stored it as a success. They now run shortly after the snapshot.
 - **Guzzle's `SetCookie::validate()` rejects a cookie without a `Domain`**, and OnlyFans sets its
   `sess` cookie without one: the session would have silently lost its cookie.
-- **The rules format `"prefix:{}:{:x}:suffix"` has a colon inside `{:x}`.** Splitting it into four
-  parts gave the wrong suffix, in a probe script and in the fake upstream; caught by a workload in
-  which every signature was rejected (which also showed the client stop sending after two
-  rejections).
+- **The rules format `"prefix:{}:{:x}:suffix"` has a colon inside `{:x}`.** Splitting it on every
+  colon crashed the first probe script and gave the fake upstream the wrong suffix; the latter was
+  caught by a workload in which every signature was rejected.
 - **The workload report undercounted "reported successful"** (whole seconds compared with a start
   time in microseconds).
 - **The extractor's first version** referred to the wrong capture group for the `sign` assembly and
@@ -158,6 +159,24 @@ code and fixed with a test unless noted:
   port was published on all interfaces, so the read-only demo could be bypassed from the network; it
   is now 127.0.0.1 only. The README was reordered to lead with the data retrieval, and the evidence
   re-recorded on the final code, each file stamped with its commit.
+**Fifth independent review** (two reviewers, of the code and documents after the fourth), all
+confirmed and fixed with a test:
+
+- **Skipping the only rules source stopped everything.** With only the web app configured, two
+  rejected sessions skipped its rules, and nothing could clear the count again because no request
+  was sent. The last source is now never skipped, and rejections are counted per release.
+- **A new release reloaded the rules on every response** that showed it (a CDN serving the old page
+  for a while). It now reloads once per release.
+- **The "last good rules" expired after a day** in the cache, despite what the docs said. They are
+  now kept until replaced.
+- **An answer was never checked against the profile asked for.** Another username, or another
+  upstream id than the one stored, is now `invalid_response`, and nothing is written.
+- **A failure while building the request** (e.g. Redis down) left a phantom `in_flight` attempt.
+  The attempt is now recorded by the client right before the request goes out.
+- **The workload's secrets check** looked only at the session alive at the end. It now checks every
+  `x-bc` and cookie the fake upstream saw.
+- Also: drift in the docs, a clean-setup check from the first version (re-run), and the scaling
+  arithmetic using the fake upstream's latency instead of the live one.
 - **Not changed:**
   - the account gate still re-queues throttled work into the shared queue (a README limit);
   - the Fans API cache logic stays in the shared refresher;

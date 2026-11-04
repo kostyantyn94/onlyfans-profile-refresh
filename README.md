@@ -51,9 +51,9 @@ Checked live on 4 Nov:
 | Review finding | Change | Tests / evidence |
 |---|---|---|
 | The integration called the managed Fans API endpoint instead of OnlyFans | The default driver signs its requests to `onlyfans.com/api2/v2/users/{username}` itself, as above. The Fans API client stays as the `fansapi` driver, for comparison only ([appendix](#appendix-the-fans-api-driver-and-the-public-demo)). | [`OnlyFansClientTest`](tests/Feature/OnlyFansClientTest.php), [`RequestSignerTest`](tests/Unit/RequestSignerTest.php), [`WebAppRulesExtractorTest`](tests/Unit/WebAppRulesExtractorTest.php); live: [14](docs/evidence/14-live-onlyfans-fetch.txt), [15](docs/evidence/15-live-probes.txt), [16](docs/evidence/16-webapp-rules.txt); rules rotation: [13](docs/evidence/13-workload-rules-rotation.txt) |
-| The response to the forced-fresh request was not checked for stale data | Every response goes through the same checks. If `?fresh=true` still returns an old snapshot, it is not stored: `cache_still_too_old`, retried with backoff. | [12](docs/evidence/12-review-fixes-tests.txt) |
-| That extra request could exceed the ten-attempt limit | The budget is checked before every call, and each attempt is recorded *before* its request goes out, in its own commit. A follow-up that would be the 11th is not sent, and a redelivered job with no attempts left sends nothing. A call whose worker died before storing the answer still counts (`in_flight`). | [12](docs/evidence/12-review-fixes-tests.txt), [`RealWorkerTest`](tests/Feature/RealWorkerTest.php), [06](docs/evidence/06-crash-before-write.txt) |
-| The profile update and the attempt record were committed separately | The profile write and its attempt's result commit in one transaction, on success and on failure: a crash leaves both or neither. | [12](docs/evidence/12-review-fixes-tests.txt) |
+| The response to the forced-fresh request was not checked for stale data (Fans API driver) | Every response goes through the same checks. If `?fresh=true` still returns an old snapshot, it is not stored: `cache_still_too_old`, retried with backoff. | [12](docs/evidence/12-review-fixes-tests.txt) |
+| That extra request could exceed the ten-attempt limit (budget: both drivers) | The budget is checked before every call, and each attempt is recorded right before its request goes out, in its own commit. A follow-up that would be the 11th is not sent, and a redelivered job with no attempts left sends nothing. A call whose worker died before storing the answer still counts (`in_flight`). | [12](docs/evidence/12-review-fixes-tests.txt), [`RealWorkerTest`](tests/Feature/RealWorkerTest.php), [06](docs/evidence/06-crash-before-write.txt) |
+| The profile update and the attempt record were committed separately (both drivers) | The profile write and its attempt's result commit in one transaction, on success and on failure: a crash leaves both or neither. | [12](docs/evidence/12-review-fixes-tests.txt) |
 
 The stale-response and extra-request findings are about the Fans API driver's cache (`?fresh=true`).
 OnlyFans' api2 has no cache, so on the default driver every request is one attempt with live data. The attempt budget and
@@ -94,7 +94,7 @@ refresh is pending. Only tested on Windows 11 with Docker Desktop.
 |---|---|
 | `docker compose exec app php artisan profiles:fetch madison420ivy [--queue]` | fetch from onlyfans.com now in this process, or hand it to Horizon |
 | `docker compose exec app php artisan onlyfans:rules [--reload]` | the signing rules in use, read from OnlyFans' web app (no API request) |
-| `docker compose exec app php artisan test` | 173 tests (Postgres and Redis of their own, never a real upstream) |
+| `docker compose exec app php artisan test` | 177 tests (Postgres and Redis of their own, never a real upstream) |
 | `docker compose exec -e REFRESH_HANDLER=legacy app php artisan test --group=incident` | the incident tests against the **old** handler: 6 of 7 fail |
 | `docker compose exec app php artisan workload:run --handler=legacy` / `--handler=v2` | the workload, before / after |
 | `docker compose exec app php artisan workload:run --rotate-rules=4` | the same, with the signing rules changing 4 s in |
@@ -127,8 +127,9 @@ the rules and the session are described in [docs/signing.md](docs/signing.md). I
   - Rejections are counted per *session*, in a fixed 30-minute window. Rules OnlyFans accepted in
     the last 10 minutes are not counted against at all, so a few distrusted sessions cannot switch
     off good rules.
-  - Rules rejected for two different sessions are skipped. If no source is left, nothing is sent
-    (`rules_unavailable`).
+  - Rules rejected for two different sessions give way to the next source, if one is configured.
+    The last source is never skipped: sending nothing would stop every refresh with no request left
+    to prove the rules good again. Each refresh is still bounded by its `signature_rejected` tries.
 - **The session's cookies** are applied from every response under a per-account lock, kept with
   their expiry, and encrypted at rest.
 
@@ -185,6 +186,9 @@ fetch, validate, then write or classify the failure.
   The incident formats need a revision. Optional fields with a wrong type or a value that would not
   fit the column are skipped and keep their stored value. A follow-up response (Fans API's
   `?fresh=true`) passes the same checks as the first.
+- **The answer must be the profile asked for.** An OnlyFans or Fans API answer for another username,
+  or with another upstream id than the one stored (the username now belongs to someone else), is
+  `invalid_response` and writes nothing.
 - **Only a newer revision writes** ([`ProfileStore`](app/Refresh/ProfileStore.php)): one statement,
   `UPDATE ... WHERE revision IS NULL OR revision < :new`, so of two racing responses only the newer
   can win whatever order the workers commit in. The same revision again is `unchanged` (confirmed,
@@ -222,7 +226,7 @@ holds no worker.
 | 5xx, incl. an empty 500 | `server_error` | randomised exponential backoff, 5 s base, 60 s cap (rides out ~30 s of errors) | 4 |
 | timeout, 408, 504 | `timeout` | same | 4 |
 | 400 "Please refresh the page" | `signature_rejected` | rules marked for reload, guest session renewed, retried with backoff from 5 s | 3 |
-| no usable signing rules | `rules_unavailable` | nothing sent; retried from 60 s | 3 |
+| no source has valid signing rules (and none are cached) | `rules_unavailable` | nothing sent; retried from 60 s | 3 |
 | another worker is loading the rules | (deferred) | nothing sent, no attempt spent; tried again in 3 s | – |
 | Fans API: old snapshot even with `?fresh=true` | `cache_still_too_old` | not stored; retried from 30 s | 3 |
 | 404, 410 / 401, 403 / other 4xx / invalid body | `not_found` / `auth_failed` / `client_error` / `invalid_response` | fails at once, data kept | 1 |
@@ -350,10 +354,10 @@ reached the worker, network partitions, or a frozen rather than dead machine.
 
 ## Observability
 
-Every refresh event is one JSON line in `storage/logs/refresh.log` with `refresh_id`, `account`,
-`account_id`, `profile_id`, `username`, `job_id`, `job_attempt`, `upstream_attempt`, `outcome`,
-`http_status`, `retry_in_seconds`, `duration_ms` (and `format`, `revision`, `likes`,
-`memory_peak_mb` on success). Events: `queued`, `deferred` (debug), `retry_scheduled`,
+Every refresh event is one JSON line in `storage/logs/refresh.log` with `refresh_id`, `profile_id`
+and `account_id`; the lines of an attempt add `account`, `username`, `job_id`, `job_attempt`,
+`upstream_attempt`, `outcome`, `http_status`, `retry_in_seconds`, `duration_ms` (and `format`,
+`revision`, `likes`, `memory_peak_mb` on success). Events: `queued`, `deferred` (debug), `retry_scheduled`,
 `cache_too_old`, `success` / `unchanged` / `stale_ignored`, `failed`, `gave_up`, `skipped_not_pending`;
 for signing:
 - `onlyfans.rules_loaded`: the source, the release and the sources passed over, with the reason;
@@ -365,7 +369,7 @@ for signing:
 `php artisan onlyfans:rules [--reload]` shows the rules in use and where they came from. One
 refresh of the rules rotation run ([13](docs/evidence/13-workload-rules-rotation.txt)), through a
 429, the account's cooldown and a rejected signature, with the signing events around it (real
-lines, abridged; every line also carries `account`, `profile_id`, `username`, `job_id`):
+lines, abridged; the attempt lines also carry `account`, `username`, `job_id`):
 
 ```text
 $ grep 98d6e46d-508c-4832-a912-a9be665419e4 storage/logs/refresh.log   (+ the onlyfans.* lines)
@@ -454,8 +458,9 @@ against what is stored.
 - **Unreadable code.** If that code cannot be read, `onlyfans.rules_loaded` or
   `onlyfans.rules_unavailable` says why. The last good rules stay in use while OnlyFans still accepts
   them (on 4 Nov it accepted an earlier release's).
-- **Rules condemned.** Once those rules are rejected for two sessions, `rules_unavailable` stops all
-  requests rather than collecting more rejections.
+- **Old rules rejected.** Once OnlyFans rejects them too, every refresh ends in
+  `signature_rejected` after its 3 tries and is retried later; `onlyfans.signature_rejected` and the
+  failing-now count on the dashboard show it.
 
 To recover by hand, either adjust the extractor to the new code shape, or put the new rules in a
 JSON file and list it first in `ONLYFANS_RULES_SOURCES` (a public feed there works as a stopgap).
@@ -466,11 +471,10 @@ JSON file and list it first in `ONLYFANS_RULES_SOURCES` (a public feed there wor
 - **Only tested on Windows 11 + Docker Desktop.** macOS should work; on Linux, `setup.sh` makes
   `storage/`, `bootstrap/cache` and `.env` writable for the containers' user, which may not be enough
   on every setup.
-  The check from a fresh clone in an empty folder ([10](docs/evidence/10-clean-setup.txt)) was
-  recorded on the first version: `setup.sh` and the test suite. Since then `setup.sh` changed only
-  its closing message, `.env.example` gained the `ONLYFANS_*` settings (all optional), the new
-  migration and seeder run in every test run, and `compose.yaml` binds the UI port to 127.0.0.1;
-  the lockfiles are unchanged.
+  A fresh clone in an empty folder at the final code ([10](docs/evidence/10-clean-setup.txt)):
+  `setup.sh`, the test suite, the rules read from OnlyFans' web app, the UI answering. It ran as a
+  second stack next to the first, with the base URL on the fake upstream so that it made no API
+  request to onlyfans.com.
 - **The rules extraction follows the obfuscator's current output shape**: a string table, the
   rotation loop, wrapper functions, a helper object and the checksum as a sum of characters. It was
   checked on one real release (`202611031453-fbc506331f`) and on synthetic code of the same shape
@@ -537,9 +541,9 @@ app/Console/        profiles:fetch|enqueue-due|repair, onlyfans:rules,
                     workload:run|check|crash|throughput|scheduler-memory
 fake-upstream/      stand-in for OnlyFans' api2 (checks signatures, can rotate its rules) and Fans API
 resources/fixtures/ upstream response fixtures, incl. real madison420ivy responses, made-up signing rules
-tests/              173 PHPUnit tests; Support/SyntheticWebApp builds obfuscated signing code from
+tests/              177 PHPUnit tests; Support/SyntheticWebApp builds obfuscated signing code from
                     made-up rules (no OnlyFans code is in the repository)
-docs/               scaling.md; evidence/ (tests, workload, crash, throughput, memory, clean setup, live fetches)
+docs/               signing.md, scaling.md; evidence/ (tests, workload, crash, throughput, memory, clean setup, live fetches)
 ```
 
 ## Appendix: the Fans API driver and the public demo
