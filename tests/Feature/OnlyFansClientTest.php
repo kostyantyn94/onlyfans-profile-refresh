@@ -9,6 +9,7 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Str;
+use Tests\Support\SyntheticWebApp;
 use Tests\TestCase;
 
 /** The signed OnlyFans client, driven through the refresh job. */
@@ -50,6 +51,38 @@ class OnlyFansClientTest extends TestCase
                 && preg_match('/^[a-f0-9]{40}$/', $request->header('x-bc')[0]) === 1
                 && $request->header('User-Agent')[0] === config('services.onlyfans.user_agent')
                 && ! $request->hasHeader('Authorization');
+        });
+    }
+
+    public function test_with_rules_read_from_the_web_app_the_request_carries_its_release(): void
+    {
+        $rules = [
+            'static_param' => 'WebAppStaticParam0123456789abcde', 'prefix' => '55555', 'suffix' => 'abcdef55',
+            'checksum_indexes' => [0, 2, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 39, 39, 1, 3, 5, 7, 9, 11, 13, 15, 17],
+            'checksum_constant' => 444,
+        ];
+        $web = new SyntheticWebApp($rules, 4);
+        config(['services.onlyfans.rules_sources' => ['upstream.test' => ['webapp:https://upstream.test/']]]);
+        $profile = $this->profileWithValidData();
+        Http::fake([
+            'upstream.test/api2/*' => Http::response($this->user()),
+            'upstream.test/' => Http::response($web->page()),
+            SyntheticWebApp::BASE.'app.js' => Http::response($web->app()),
+            SyntheticWebApp::BASE.'7777.js' => Http::response($web->chunk()),
+        ]);
+
+        $this->runRefresh($profile);
+
+        $this->assertSame('success', $profile->refresh()->last_attempt_status);
+        Http::assertSent(function (Request $request) use ($profile, $rules) {
+            if (! str_contains($request->url(), '/api2/')) {
+                return false;
+            }
+
+            $path = '/api2/v2/users/'.$profile->username;
+            $expected = (new RequestSigner)->sign(SigningRules::fromArray([...$rules, 'app_token' => '0123456789abcdef0123456789abcdef']), $path, (int) $request->header('time')[0], '0');
+
+            return $request->header('x-of-rev')[0] === SyntheticWebApp::RELEASE && $request->header('sign')[0] === $expected;
         });
     }
 

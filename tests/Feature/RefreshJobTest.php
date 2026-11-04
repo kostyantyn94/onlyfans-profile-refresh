@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Profile;
 use App\Models\RefreshAttempt;
 use App\Refresh\AccountThrottle;
+use App\Refresh\RefreshScheduler;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Queue\MaxAttemptsExceededException;
@@ -488,7 +489,7 @@ class RefreshJobTest extends TestCase
         $refreshId = (string) Str::uuid();
         Profile::query()->whereKey($profile->id)->update(['refresh_queued_at' => now(), 'pending_refresh_id' => $refreshId]);
 
-        $job = app(\App\Refresh\RefreshScheduler::class)->makeJob($profile->id, $profile->account_id, $refreshId);
+        $job = app(RefreshScheduler::class)->makeJob($profile->id, $profile->account_id, $refreshId);
         $job->failed(new MaxAttemptsExceededException('App\Jobs\RefreshProfile has been attempted too many times.'));
 
         $profile->refresh();

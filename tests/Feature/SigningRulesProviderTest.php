@@ -6,6 +6,7 @@ use App\Upstream\OnlyFans\SigningRulesProvider;
 use App\Upstream\OnlyFans\SigningRulesUnavailable;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Tests\Support\SyntheticWebApp;
 use Tests\TestCase;
 
 /** Loading, sharing and rejecting signing rules, as several workers see it. */
@@ -16,6 +17,14 @@ class SigningRulesProviderTest extends TestCase
     private const FIRST = 'resources/fixtures/upstream/onlyfans-test-rules.json';
 
     private const NEXT = 'resources/fixtures/upstream/onlyfans-test-rules-rotated.json';
+
+    private const WEB_RULES = [
+        'static_param' => 'WebAppStaticParam0123456789abcde',
+        'prefix' => '55555',
+        'suffix' => 'abcdef55',
+        'checksum_indexes' => [0, 2, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 39, 39, 1, 3, 5, 7, 9, 11, 13, 15, 17],
+        'checksum_constant' => 444,
+    ];
 
     private SigningRulesProvider $provider;
 
@@ -81,6 +90,95 @@ class SigningRulesProviderTest extends TestCase
         // Free lock: this worker reloads.
         $this->provider->for(self::BASE);
         Http::assertSentCount(2);
+    }
+
+    public function test_rules_are_read_from_the_web_app_and_kept_per_release(): void
+    {
+        $web = new SyntheticWebApp(self::WEB_RULES, 5);
+        config(['services.onlyfans.rules_sources' => ['upstream.test' => ['webapp:https://upstream.test/', self::FIRST]]]);
+        Http::fake([
+            'upstream.test/' => Http::response($web->page()),
+            SyntheticWebApp::BASE.'app.js' => Http::response($web->app()),
+            SyntheticWebApp::BASE.'7777.js' => Http::response($web->chunk()),
+        ]);
+
+        $rules = $this->provider->for(self::BASE);
+
+        $this->assertSame(['55555', self::WEB_RULES['static_param'], SyntheticWebApp::RELEASE], [$rules->prefix, $rules->staticParam, $rules->release]);
+        $this->assertSame('webapp:https://upstream.test/', $rules->source);
+        Http::assertSentCount(3);
+
+        // An hour later, same release: only the page is read again.
+        $this->travel(61)->minutes();
+        $this->provider->for(self::BASE);
+        Http::assertSentCount(4);
+
+        $reads = collect($this->refreshLogLines())->where('message', 'onlyfans.webapp_rules_read');
+        $this->assertCount(1, $reads, 'the code was read once');
+        $this->assertSame(['7777.js', '807777'], [$reads->first()['context']['signing_script'], $reads->first()['context']['signing_module']]);
+    }
+
+    public function test_when_the_web_app_cannot_be_read_the_next_source_is_used(): void
+    {
+        $web = new SyntheticWebApp(self::WEB_RULES);
+        config(['services.onlyfans.rules_sources' => ['upstream.test' => ['webapp:https://upstream.test/', self::FIRST]]]);
+        Http::fake([
+            'upstream.test/' => Http::response($web->page()),
+            SyntheticWebApp::BASE.'app.js' => Http::response($web->app()),
+            // A release whose signing code looks different.
+            SyntheticWebApp::BASE.'7777.js' => Http::response('/* 807777:function( something else */'),
+        ]);
+
+        $this->assertSame('12345', $this->provider->for(self::BASE)->prefix, 'the fixture file, next in line');
+        $loaded = collect($this->refreshLogLines())->firstWhere('message', 'onlyfans.rules_loaded');
+        $this->assertSame(self::FIRST, $loaded['context']['rules_source']);
+        $this->assertStringStartsWith('webapp:https://upstream.test/: ', $loaded['context']['passed_over'][0], 'why the web app was passed over');
+    }
+
+    public function test_a_release_that_cannot_be_read_is_not_downloaded_again_on_every_reload(): void
+    {
+        $web = new SyntheticWebApp(self::WEB_RULES);
+        config(['services.onlyfans.rules_sources' => ['upstream.test' => ['webapp:https://upstream.test/', self::FIRST]]]);
+        Http::fake([
+            'upstream.test/' => Http::response($web->page()),
+            SyntheticWebApp::BASE.'app.js' => Http::response($web->app()),
+            SyntheticWebApp::BASE.'7777.js' => Http::response('/* 807777:function( something else */'),
+        ]);
+        $this->provider->for(self::BASE);
+        Http::assertSentCount(3);
+
+        // A rejection reloads at once: only the page is read, the release is known to be unreadable.
+        $this->provider->forget(self::BASE);
+        $this->assertSame('12345', $this->provider->for(self::BASE)->prefix);
+        Http::assertSentCount(4);
+
+        // Ten minutes later the release's code is read again.
+        $this->travel(11)->minutes();
+        $this->provider->forget(self::BASE);
+        $this->provider->for(self::BASE);
+        Http::assertSentCount(7);
+    }
+
+    public function test_the_rules_in_use_and_their_source_can_be_shown(): void
+    {
+        // Rules from the fixture file are in use; the web app becomes the first source.
+        $this->provider->for(self::BASE);
+        $web = new SyntheticWebApp(self::WEB_RULES);
+        config(['services.onlyfans.rules_sources' => ['upstream.test' => ['webapp:https://upstream.test/', self::FIRST]]]);
+        Http::fake([
+            'upstream.test/' => Http::response($web->page()),
+            SyntheticWebApp::BASE.'app.js' => Http::response($web->app()),
+            SyntheticWebApp::BASE.'7777.js' => Http::response($web->chunk()),
+        ]);
+
+        $this->artisan('onlyfans:rules', ['--base-url' => self::BASE])
+            ->expectsOutputToContain(self::FIRST)
+            ->assertSuccessful();
+        $this->artisan('onlyfans:rules', ['--base-url' => self::BASE, '--reload' => true])
+            ->expectsOutputToContain('webapp:https://upstream.test/')
+            ->expectsOutputToContain(SyntheticWebApp::RELEASE)
+            ->expectsOutputToContain('55555:<sha1>:<checksum, hex>:abcdef55')
+            ->assertSuccessful();
     }
 
     public function test_the_last_good_rules_stay_in_use_when_the_sources_fail(): void

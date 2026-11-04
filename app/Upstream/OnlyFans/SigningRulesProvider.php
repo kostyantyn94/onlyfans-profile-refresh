@@ -32,6 +32,11 @@ class SigningRulesProvider
     // Seconds a failed load is remembered.
     private const UNAVAILABLE_FOR = 30;
 
+    // Seconds one load may take over all sources, so a job stays inside its timeout.
+    private const LOAD_BUDGET = 12;
+
+    public function __construct(private WebAppRulesSource $webApp) {}
+
     /** @throws SigningRulesUnavailable */
     public function for(string $baseUrl): SigningRules
     {
@@ -95,6 +100,15 @@ class SigningRulesProvider
         ]);
     }
 
+    /** Forget the rules in use for the host, so the next request loads them from the sources again. */
+    public function forget(string $baseUrl): void
+    {
+        $host = $this->host($baseUrl);
+
+        Cache::forget($this->cacheKey($host));
+        Cache::forget($this->unavailableKey($host));
+    }
+
     /** @return array{rules: SigningRules, stale: bool}|null */
     private function cached(string $host): ?array
     {
@@ -143,10 +157,13 @@ class SigningRulesProvider
     {
         $sources = config('services.onlyfans.rules_sources')[$host] ?? [];
         $problems = [];
+        $deadline = microtime(true) + self::LOAD_BUDGET;
 
         foreach ($sources as $source) {
             try {
-                $rules = SigningRules::fromArray($this->read($source), $source);
+                $rules = str_starts_with($source, 'webapp:')
+                    ? $this->webApp->load(substr($source, strlen('webapp:')), $deadline)
+                    : SigningRules::fromArray($this->read($source, $deadline), $source);
             } catch (Throwable $e) {
                 $problems[] = $source.': '.$e->getMessage();
 
@@ -163,6 +180,9 @@ class SigningRulesProvider
                 'host' => $host,
                 'rules_source' => $source,
                 'rules' => substr($rules->fingerprint(), 0, 12),
+                'release' => $rules->release,
+                // Earlier sources that gave nothing usable, and why (e.g. the web app's code changed shape).
+                'passed_over' => $problems,
             ]);
 
             return $rules;
@@ -174,12 +194,17 @@ class SigningRulesProvider
             .($problems === [] ? 'no source configured' : implode('; ', $problems)));
     }
 
-    /** A source is a URL or a JSON file (absolute, or relative to the project). */
-    private function read(string $source): array
+    /** A source is "webapp:<page URL>" (see WebAppRulesSource), a rules URL, or a JSON file (absolute, or relative to the project). */
+    private function read(string $source, float $deadline): array
     {
         if (preg_match('#^https?://#i', $source) === 1) {
-            // Short: four slow sources must still fit in a job (see README, "Timeouts").
-            $response = Http::acceptJson()->connectTimeout(2)->timeout(3)->get($source);
+            $left = $deadline - microtime(true);
+
+            if ($left < 1) {
+                throw new InvalidSigningRules('skipped: no time left in this load');
+            }
+
+            $response = Http::acceptJson()->connectTimeout(2)->timeout(min(3, (int) floor($left)))->get($source);
 
             if (! $response->successful()) {
                 throw new InvalidSigningRules("HTTP {$response->status()}");

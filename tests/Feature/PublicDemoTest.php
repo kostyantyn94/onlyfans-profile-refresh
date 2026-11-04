@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Jobs\RefreshProfile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
@@ -39,7 +40,7 @@ class PublicDemoTest extends TestCase
     public function test_pagination_links_use_the_public_https_url(): void
     {
         $account = $this->makeAccount();
-        \Illuminate\Support\Facades\DB::table('profiles')->insert(array_map(fn ($i) => [
+        DB::table('profiles')->insert(array_map(fn ($i) => [
             'account_id' => $account->id, 'username' => "p-{$i}", 'created_at' => now(), 'updated_at' => now(),
         ], range(1, 60)));
 

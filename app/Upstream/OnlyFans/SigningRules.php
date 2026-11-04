@@ -28,6 +28,8 @@ final readonly class SigningRules
         public array $removeHeaders = [],
         // Where the rules were loaded from, for logs.
         public string $source = '',
+        // The web app release they were read from (sent as x-of-rev, as the web app does).
+        public ?string $release = null,
     ) {}
 
     /** @throws InvalidSigningRules */
@@ -67,7 +69,13 @@ final readonly class SigningRules
             ['user-id'],
         ));
 
-        return new self($staticParam, (string) $prefix, (string) $suffix, array_values($indexes), $constant, $appToken, $removeHeaders, $source);
+        $release = $raw['release'] ?? null;
+
+        if ($release !== null && (! is_string($release) || preg_match('/^\d{12}-[a-f0-9]{10}$/', $release) !== 1)) {
+            throw new InvalidSigningRules('missing or invalid: release');
+        }
+
+        return new self($staticParam, (string) $prefix, (string) $suffix, array_values($indexes), $constant, $appToken, $removeHeaders, $source, $release);
     }
 
     /** Identifies one set of rules, e.g. to remember that OnlyFans rejected it. */
@@ -91,6 +99,7 @@ final readonly class SigningRules
             'checksum_constant' => $this->checksumConstant,
             'app_token' => $this->appToken,
             'remove_headers' => $this->removeHeaders,
+            'release' => $this->release,
         ];
     }
 

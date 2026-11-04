@@ -39,13 +39,16 @@ return [
     'onlyfans' => [
         'base_url' => env('ONLYFANS_BASE_URL', 'https://onlyfans.com'),
 
-        // Where the current signing rules come from, per upstream host. A source
-        // is a URL or a local JSON file; they are tried in order, and rules that
-        // OnlyFans keeps rejecting are skipped (see SigningRulesProvider).
+        // Where the current signing rules come from, per upstream host, tried in
+        // order: "webapp:<page>" reads them from OnlyFans' own web app code
+        // (WebAppRulesSource); a URL or a local JSON file gives them ready-made
+        // (public rule feeds, or rules pinned by hand). Rules that OnlyFans keeps
+        // rejecting are skipped (see SigningRulesProvider).
         'rules_sources' => [
             // An empty ONLYFANS_RULES_SOURCES= in .env means the defaults too.
             'onlyfans.com' => array_values(array_filter(explode(',', (string) (env('ONLYFANS_RULES_SOURCES') ?:
-                'https://raw.githubusercontent.com/rafa-9/dynamic-rules/main/rules.json,'
+                'webapp:https://onlyfans.com/,'
+                .'https://raw.githubusercontent.com/rafa-9/dynamic-rules/main/rules.json,'
                 .'https://raw.githubusercontent.com/DATAHOARDERS/dynamic-rules/main/onlyfans.json,'
                 .'https://raw.githubusercontent.com/datawhores/onlyfans-dynamic-rules/main/dynamicRules.json,'
                 .'https://raw.githubusercontent.com/riley-access-labs/onlyfans-dynamic-rules-1/main/dynamicRules.json')))),

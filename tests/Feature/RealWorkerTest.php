@@ -2,9 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Models\Profile;
 use App\Models\RefreshAttempt;
 use App\Refresh\AccountThrottle;
 use App\Refresh\RefreshScheduler;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Redis;
 use Tests\TestCase;
@@ -80,7 +82,7 @@ class RealWorkerTest extends TestCase
         $this->assertSame('gave_up', $profile->last_attempt_status);
         $this->assertNull($profile->pending_refresh_id, 'the claim is given back');
         $this->assertSame(120_000, $profile->likes_count);
-        $this->assertSame(1, \Illuminate\Support\Facades\DB::table('failed_jobs')->count());
+        $this->assertSame(1, DB::table('failed_jobs')->count());
     }
 
     public function test_a_queued_job_replaced_after_its_claim_expired_stops_without_calling_the_upstream(): void
@@ -90,7 +92,7 @@ class RealWorkerTest extends TestCase
 
         $old = app(RefreshScheduler::class)->enqueue($profile);
         // The queue was so backed up that the claim expired and the scheduler queued a new refresh.
-        \App\Models\Profile::query()->whereKey($profile->id)->update(['refresh_queued_at' => now()->subMinutes(config('refresh.claim_expires_after_minutes') + 1)]);
+        Profile::query()->whereKey($profile->id)->update(['refresh_queued_at' => now()->subMinutes(config('refresh.claim_expires_after_minutes') + 1)]);
         $this->assertSame(1, app(RefreshScheduler::class)->enqueueDue());
         $new = $profile->refresh()->pending_refresh_id;
 

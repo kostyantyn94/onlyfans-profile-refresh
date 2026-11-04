@@ -3,7 +3,8 @@
 # "onlyfans" account (guest session) with madison420ivy, fetches it in this
 # process, then once more through Horizon, and records what was stored.
 # Writes docs/evidence/14-live-onlyfans-fetch.txt. Two profile requests to
-# onlyfans.com, plus the signing rules from the first source that works.
+# onlyfans.com, signed with rules read from OnlyFans' web app just before
+# (the page, and its scripts when the release is new to this cache).
 #
 # After this the scheduler keeps the profile fresh on its own (every 24 h).
 set -e
@@ -24,6 +25,9 @@ trap 'docker compose start scheduler >/dev/null 2>&1' EXIT
   echo
   echo '$ php artisan db:seed --force'
   run db:seed --force
+  echo
+  echo '$ php artisan onlyfans:rules --reload        # the rules the requests below are signed with'
+  run onlyfans:rules --reload
   echo
   echo '$ php artisan profiles:fetch madison420ivy          # first attempt in this process'
   run profiles:fetch madison420ivy || true

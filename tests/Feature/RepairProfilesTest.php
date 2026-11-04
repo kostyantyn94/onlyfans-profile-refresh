@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Jobs\RefreshProfile;
-use App\Models\Profile;
+use App\Refresh\RefreshScheduler;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
@@ -16,7 +16,7 @@ class RepairProfilesTest extends TestCase
         // The old handler stored 0, called it a success and scheduled the next refresh a day out.
         $this->profileWithValidData(attributes: ['likes_count' => 0, 'revision' => 11, 'last_success_at' => now()->subMinutes(10), 'next_refresh_at' => now()->addDay()]);
 
-        $this->assertSame(0, app(\App\Refresh\RefreshScheduler::class)->enqueueDue(), 'not due: the zero would stay visible for a day');
+        $this->assertSame(0, app(RefreshScheduler::class)->enqueueDue(), 'not due: the zero would stay visible for a day');
     }
 
     public function test_repair_clears_the_revision_and_requeues_profiles_written_during_the_incident(): void

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\PublicDemo;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -14,7 +15,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         // First in the web group (before CSRF), and Horizon's routes use the web
         // group too, so this also covers /horizon.
-        $middleware->web(prepend: [App\Http\Middleware\PublicDemo::class]);
+        $middleware->web(prepend: [PublicDemo::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

@@ -47,6 +47,12 @@ class OnlyFansClient implements ProfileClient
             $headers['user-id'] = $session->userId;
         }
 
+        // The web app sends its release with every request; so do we when the
+        // rules were read from that release.
+        if ($rules->release !== null) {
+            $headers['x-of-rev'] = $rules->release;
+        }
+
         if ($session->cookies !== []) {
             $headers['Cookie'] = $session->cookieHeader();
         }

@@ -1,4 +1,4 @@
-# Live probes against onlyfans.com, 4 Nov 2026, run by hand (see AI.md), before the client was written.
+# Live probes against onlyfans.com, 4 Nov 2026, run by hand (see AI.md): 1-2 before the client was written, 3 after.
 # Guest requests to GET /api2/v2/users/madison420ivy, signed by a separate Python implementation.
 
 # 1) Which public rule feed is current: one signed guest request per feed.
@@ -29,3 +29,20 @@ $ python -I probe-onlyfans.py
 # - 404 "User not found" is not_found (not retried);
 # - the 85-field user object is what Fans API returns under "data", minus its two own fields
 #   (ofapi_gender, ofapi_gender_confidence).
+
+# 3) Are the rules read from OnlyFans' own web app code accepted? (probe-webapp-rules.py, after
+#    WebAppRulesExtractor was written; see 16-webapp-rules.txt for the extraction.)
+#    Release 202611031453-fbc506331f gives static_param LVIMTEyG..., 67634:...:6ae9f59b, constant -1634;
+#    the rafa-9 feed has UQe4c0nz..., 64937:...:6aa15875, constant 728 (an earlier release's rules).
+$ python -I probe-webapp-rules.py
+A web app rules, with x-of-rev -> HTTP 200 | favoritedCount=612019 | x-of-rev in response: 202611031453-fbc506331f
+B web app rules, no x-of-rev   -> HTTP 200 | favoritedCount=612019 | x-of-rev in response: 202611031453-fbc506331f
+C rafa-9 rules,  with x-of-rev -> HTTP 200 | favoritedCount=612019 | x-of-rev in response: 202611031453-fbc506331f
+D rafa-9 rules,  no x-of-rev   -> HTTP 200 | favoritedCount=612019 | x-of-rev in response: 202611031453-fbc506331f
+
+# What the client takes from this:
+# - the rules read from the current release are accepted: the web app is the first rules source,
+#   the public feeds (which lag behind releases) are the fallback;
+# - OnlyFans still accepts at least one earlier release's rules, so a feed that lags a release is
+#   not immediately broken, and two feeds that lag further (datawhores, riley) are rejected (1);
+# - x-of-rev is not required; the client sends it with web app rules, as the web app does.
