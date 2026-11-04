@@ -1,15 +1,16 @@
+# Commit 47cb4da (Reload rules once per rejection burst; crash check waits for a result), recorded 2026-11-04T03:25Z
 # php artisan test --group=incident (fixed handler)
 
 
    PASS  Tests\Feature\IncidentRegressionTest
-  ✓ old format is still accepted                                         0.45s  
+  ✓ old format is still accepted                                         0.50s  
   ✓ new format with likes inside profile is stored                       0.09s  
-  ✓ rate limit without retry after keeps data and is retried later       0.11s  
-  ✓ server error with empty body keeps data and is retried later         0.09s  
+  ✓ rate limit without retry after keeps data and is retried later       0.17s  
+  ✓ server error with empty body keeps data and is retried later         0.23s  
   ✓ missing likes is invalid not zero                                    0.13s  
   ✓ an older revision arriving last does not overwrite newer data        0.12s  
-  ✓ the same job delivered twice neither duplicates nor corrupts         0.22s  
+  ✓ the same job delivered twice neither duplicates nor corrupts         0.11s  
 
   Tests:    7 passed (29 assertions)
-  Duration: 1.31s
+  Duration: 1.46s
 

@@ -1,31 +1,33 @@
+# Commit 47cb4da (Reload rules once per rejection burst; crash check waits for a result), recorded 2026-11-04T03:27Z
 $ php artisan workload:run --handler=v2 --rotate-rules=4
-Queued 40 + 10 refreshes with handler=v2 in 0.33 s. Waiting for Horizon...
-  t=  0s  busy: 40 waiting, oldest   0.7s,  0 ok  |  calm: 10 waiting, oldest   0.7s,  0 ok
-  t=  1s  busy: 40 waiting, oldest   1.4s,  0 ok  |  calm: 10 waiting, oldest   1.4s,  0 ok
-  t=  2s  busy: 40 waiting, oldest   2.4s,  0 ok  |  calm:  2 waiting, oldest   2.4s,  8 ok
-  t=  3s  busy: 40 waiting, oldest   3.4s,  0 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t=  4s  busy: 40 waiting, oldest   4.4s,  0 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t=  5s  busy: 40 waiting, oldest   5.4s,  0 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t=  6s  busy: 40 waiting, oldest   6.4s,  0 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t=  7s  busy: 33 waiting, oldest   7.5s,  7 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t=  8s  busy: 33 waiting, oldest   8.5s,  7 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t=  9s  busy: 33 waiting, oldest   9.5s,  7 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 10s  busy: 28 waiting, oldest  10.5s, 12 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 11s  busy: 28 waiting, oldest  11.5s, 12 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 12s  busy: 23 waiting, oldest  12.5s, 17 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 13s  busy: 23 waiting, oldest  13.5s, 17 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 14s  busy: 23 waiting, oldest  14.5s, 17 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 15s  busy: 19 waiting, oldest  15.5s, 21 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 16s  busy: 19 waiting, oldest  16.5s, 21 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 17s  busy: 14 waiting, oldest  17.5s, 26 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 18s  busy: 14 waiting, oldest  18.5s, 26 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 19s  busy: 14 waiting, oldest  19.5s, 26 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 20s  busy: 10 waiting, oldest  20.5s, 30 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 21s  busy:  3 waiting, oldest  21.5s, 37 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 22s  busy:  3 waiting, oldest  22.5s, 37 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 23s  busy:  2 waiting, oldest  23.5s, 38 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 24s  busy:  2 waiting, oldest  24.5s, 38 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
-  t= 25s  busy:  1 waiting, oldest  25.5s, 39 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+Queued 40 + 10 refreshes with handler=v2 in 0.16 s. Waiting for Horizon...
+  t=  0s  busy: 40 waiting, oldest   1.0s,  0 ok  |  calm: 10 waiting, oldest   1.0s,  0 ok
+  t=  1s  busy: 40 waiting, oldest   2.0s,  0 ok  |  calm: 10 waiting, oldest   2.0s,  0 ok
+  t=  2s  busy: 40 waiting, oldest   3.0s,  0 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t=  3s  busy: 40 waiting, oldest   4.0s,  0 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t=  4s  busy: 40 waiting, oldest   5.0s,  0 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t=  5s  busy: 40 waiting, oldest   6.0s,  0 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t=  6s  busy: 38 waiting, oldest   7.0s,  2 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t=  7s  busy: 33 waiting, oldest   8.0s,  7 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t=  8s  busy: 33 waiting, oldest   9.0s,  7 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t=  9s  busy: 28 waiting, oldest  10.0s, 12 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 10s  busy: 28 waiting, oldest  11.0s, 12 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 11s  busy: 28 waiting, oldest  12.0s, 12 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 12s  busy: 24 waiting, oldest  13.0s, 16 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 13s  busy: 24 waiting, oldest  14.0s, 16 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 14s  busy: 19 waiting, oldest  15.0s, 21 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 15s  busy: 15 waiting, oldest  16.0s, 25 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 16s  busy: 15 waiting, oldest  17.1s, 25 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 17s  busy: 15 waiting, oldest  18.1s, 25 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 18s  busy: 11 waiting, oldest  19.1s, 29 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 19s  busy:  7 waiting, oldest  20.1s, 33 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 20s  busy:  7 waiting, oldest  20.8s, 33 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 21s  busy:  3 waiting, oldest  21.8s, 37 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 22s  busy:  3 waiting, oldest  22.8s, 37 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 23s  busy:  3 waiting, oldest  23.8s, 37 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 24s  busy:  1 waiting, oldest  24.8s, 39 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 25s  busy:  1 waiting, oldest  25.8s, 39 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
+  t= 26s  busy:  1 waiting, oldest  26.8s, 39 ok  |  calm:  0 waiting, oldest   0.0s, 10 ok
 
 Handler: v2
 +-------------------------------+------------------------------------+------------+
@@ -39,17 +41,17 @@ Handler: v2
 | wrong_data                    | 0                                  | 0          |
 | failed_for_good               | 0                                  | 0          |
 | upstream_requests             | 54                                 | 10         |
-| upstream_statuses             | {"200":40,"400":1,"429":9,"500":4} | {"200":10} |
+| upstream_statuses             | {"200":40,"400":1,"429":8,"500":5} | {"200":10} |
 | attempts_recorded_by_app      | 54                                 | 10         |
 | attempts_per_verified_success | 1.35                               | 1          |
-| max_oldest_wait_s             | 25.5                               | 2.4        |
-| all_finished_after_s          | 25.4                               | 2.3        |
+| max_oldest_wait_s             | 26.8                               | 2.5        |
+| all_finished_after_s          | 26.3                               | 1.9        |
 +-------------------------------+------------------------------------+------------+
 Failed jobs in Horizon during the run: 0
 Session tokens or keys found in logs: 0
-Report: storage/app/workload/v2-20261104-005052.json
+Report: storage/app/workload/v2-20261104-032706.json
 
 # signing events in storage/logs/refresh.log during the run:
-{"message":"onlyfans.rules_loaded","context":{"host":"fake-upstream","rules_source":"http://fake-upstream:8080/rules.json","rules":"aa2a8f263e64"},"level":200,"level_name":"INFO","channel":"local","datetime":"2026-11-04T00:50:53.471057+00:00","extra":{}}
-{"message":"onlyfans.signature_rejected","context":{"host":"fake-upstream","rules_source":"http://fake-upstream:8080/rules.json","rules":"aa2a8f263e64","sessions_rejected":1,"skipped":false,"onlyfans_rev":null},"level":300,"level_name":"WARNING","channel":"local","datetime":"2026-11-04T00:50:56.552196+00:00","extra":{}}
-{"message":"onlyfans.rules_loaded","context":{"host":"fake-upstream","rules_source":"http://fake-upstream:8080/rules.json","rules":"ea4fdcf9fa3d"},"level":200,"level_name":"INFO","channel":"local","datetime":"2026-11-04T00:50:56.569862+00:00","extra":{}}
+{"message":"onlyfans.rules_loaded","context":{"host":"fake-upstream","rules_source":"http://fake-upstream:8080/rules.json","rules":"aa2a8f263e64","release":null,"passed_over":[]},"level":200,"level_name":"INFO","channel":"local","datetime":"2026-11-04T03:27:07.777290+00:00","extra":{}}
+{"message":"onlyfans.signature_rejected","context":{"host":"fake-upstream","rules_source":"http://fake-upstream:8080/rules.json","rules":"aa2a8f263e64","rules_release":null,"onlyfans_rev":null,"rules_proven":true,"sessions_rejected":0,"skipped":false},"level":300,"level_name":"WARNING","channel":"local","datetime":"2026-11-04T03:27:12.849562+00:00","extra":{}}
+{"message":"onlyfans.rules_loaded","context":{"host":"fake-upstream","rules_source":"http://fake-upstream:8080/rules.json","rules":"ea4fdcf9fa3d","release":null,"passed_over":[]},"level":200,"level_name":"INFO","channel":"local","datetime":"2026-11-04T03:27:12.862906+00:00","extra":{}}

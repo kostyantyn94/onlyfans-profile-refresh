@@ -1,16 +1,17 @@
-Refresh afe171eb-b38d-43cb-a86b-79b593ecc471 queued; the worker that picks it up will be killed before-write.
-Worker killed after 1.0 s. Profile now: likes=120000 revision=10, claim still held, attempts recorded: 0, jobs reserved in Redis: 1.
+# Commit 47cb4da (Reload rules once per rejection burst; crash check waits for a result), recorded 2026-11-04T03:29Z
+Refresh cc2b2423-fa5f-4823-b6d3-638ee59b4b4d queued; the worker that picks it up will be killed before-write.
+Worker killed after 1.0 s. Profile now: likes=120000 revision=10, claim still held, attempts recorded: 1, jobs reserved in Redis: 1.
 Waiting for Redis to hand the job out again (retry_after = 90 s)...
-+------------------------------------------+--------------------------+
-| check                                    | result                   |
-+------------------------------------------+--------------------------+
-| redelivered                              | yes, 91 s after queueing |
-| profile rows for crash-001               | 1                        |
-| final likes / revision                   | 121000 / 11              |
-| attempts recorded (outcome, job attempt) | success (#2)             |
-| second delivery                          | did the refresh          |
-| upstream requests                        | 2                        |
-| claim                                    | released                 |
-| last_attempt_status                      | success                  |
-| failed jobs                              | 0                        |
-+------------------------------------------+--------------------------+
++------------------------------------------+------------------------------+
+| check                                    | result                       |
++------------------------------------------+------------------------------+
+| redelivered                              | yes, 91 s after queueing     |
+| profile rows for crash-001               | 1                            |
+| final likes / revision                   | 121000 / 11                  |
+| attempts recorded (outcome, job attempt) | in_flight (#1), success (#2) |
+| second delivery                          | did the refresh              |
+| upstream requests                        | 2                            |
+| claim                                    | released                     |
+| last_attempt_status                      | success                      |
+| failed jobs                              | 0                            |
++------------------------------------------+------------------------------+

@@ -2,6 +2,8 @@
 
 Used by the tests (`tests/`). The local fake upstream (`fake-upstream/server.php`) builds its answers in the same shapes (old, new, OnlyFans, Fans API) from its scenario instead of reading these files, and signs with its own made-up rules (`fake-upstream/rules.json`, `rules-rotated.json`).
 
+OnlyFans' web app code is not stored here: the rules extraction tests build obfuscated code of the same shape from made-up rules (`tests/Support/SyntheticWebApp.php`).
+
 | File | What it is | Status |
 |---|---|---|
 | `onlyfans-madison420ivy.json` | Real OnlyFans `GET /api2/v2/users/madison420ivy` response (signed, guest session), captured 2026-11-04 by `docs/evidence/probe-onlyfans.py`. Likes are `favoritedCount`. The same 85 fields as Fans API's `data`, without its two `ofapi_*` fields. | 200 |

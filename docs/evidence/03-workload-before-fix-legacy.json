@@ -1,6 +1,6 @@
 {
     "handler": "legacy",
-    "started_at": "2026-11-04T00:49:44+00:00",
+    "started_at": "2026-11-04T03:25:56+00:00",
     "parameters": {
         "busy_profiles": 40,
         "calm_profiles": 10,
@@ -23,9 +23,9 @@
             "refreshes_queued": 40,
             "refreshes_finished": 40,
             "reported_successful": 40,
-            "verified_successful": 21,
+            "verified_successful": 18,
             "kept_last_valid_data": 0,
-            "wrong_data": 19,
+            "wrong_data": 22,
             "wrong_data_examples": [
                 {
                     "username": "busy-001",
@@ -33,27 +33,27 @@
                     "revision": null
                 },
                 {
-                    "username": "busy-006",
+                    "username": "busy-002",
                     "likes": 0,
-                    "revision": 11
+                    "revision": null
                 },
                 {
-                    "username": "busy-008",
+                    "username": "busy-004",
                     "likes": 0,
-                    "revision": 11
+                    "revision": null
                 }
             ],
             "failed_for_good": 0,
-            "upstream_requests": 64,
+            "upstream_requests": 72,
             "upstream_statuses": {
-                "200": 38,
-                "429": 22,
+                "200": 34,
+                "429": 34,
                 "500": 4
             },
             "attempts_recorded_by_app": 40,
-            "attempts_per_verified_success": 3.05,
-            "max_oldest_wait_s": 15.8,
-            "all_finished_after_s": 15.2
+            "attempts_per_verified_success": 4,
+            "max_oldest_wait_s": 16.8,
+            "all_finished_after_s": 17
         },
         "calm": {
             "refreshes_queued": 10,
@@ -86,8 +86,8 @@
             },
             "attempts_recorded_by_app": 10,
             "attempts_per_verified_success": 2,
-            "max_oldest_wait_s": 15,
-            "all_finished_after_s": 14.5
+            "max_oldest_wait_s": 15.5,
+            "all_finished_after_s": 15.7
         }
     },
     "timeline": [
@@ -95,12 +95,12 @@
             "t": 0,
             "busy": {
                 "waiting": 40,
-                "oldest_wait_s": 1,
+                "oldest_wait_s": 0.2,
                 "refreshed_ok": 0
             },
             "calm": {
                 "waiting": 10,
-                "oldest_wait_s": 1,
+                "oldest_wait_s": 0.2,
                 "refreshed_ok": 0
             }
         },
@@ -108,12 +108,12 @@
             "t": 1,
             "busy": {
                 "waiting": 40,
-                "oldest_wait_s": 2,
+                "oldest_wait_s": 1.2,
                 "refreshed_ok": 0
             },
             "calm": {
                 "waiting": 10,
-                "oldest_wait_s": 2,
+                "oldest_wait_s": 1.2,
                 "refreshed_ok": 0
             }
         },
@@ -121,12 +121,12 @@
             "t": 2,
             "busy": {
                 "waiting": 40,
-                "oldest_wait_s": 3,
+                "oldest_wait_s": 2.2,
                 "refreshed_ok": 0
             },
             "calm": {
                 "waiting": 10,
-                "oldest_wait_s": 3,
+                "oldest_wait_s": 2.2,
                 "refreshed_ok": 0
             }
         },
@@ -134,116 +134,116 @@
             "t": 3,
             "busy": {
                 "waiting": 40,
-                "oldest_wait_s": 4,
+                "oldest_wait_s": 3.2,
                 "refreshed_ok": 0
             },
             "calm": {
                 "waiting": 10,
-                "oldest_wait_s": 4,
+                "oldest_wait_s": 3.2,
                 "refreshed_ok": 0
             }
         },
         {
             "t": 4,
             "busy": {
-                "waiting": 39,
-                "oldest_wait_s": 5,
+                "waiting": 38,
+                "oldest_wait_s": 4.2,
                 "refreshed_ok": 0
             },
             "calm": {
                 "waiting": 10,
-                "oldest_wait_s": 5,
+                "oldest_wait_s": 4.2,
                 "refreshed_ok": 0
             }
         },
         {
             "t": 5,
             "busy": {
-                "waiting": 39,
-                "oldest_wait_s": 6,
+                "waiting": 38,
+                "oldest_wait_s": 5.2,
                 "refreshed_ok": 0
             },
             "calm": {
                 "waiting": 10,
-                "oldest_wait_s": 6,
+                "oldest_wait_s": 5.2,
                 "refreshed_ok": 0
             }
         },
         {
             "t": 6,
             "busy": {
-                "waiting": 39,
-                "oldest_wait_s": 7,
+                "waiting": 38,
+                "oldest_wait_s": 6.2,
                 "refreshed_ok": 0
             },
             "calm": {
                 "waiting": 10,
-                "oldest_wait_s": 7,
+                "oldest_wait_s": 6.2,
                 "refreshed_ok": 0
             }
         },
         {
             "t": 7,
             "busy": {
-                "waiting": 35,
-                "oldest_wait_s": 8,
-                "refreshed_ok": 3
+                "waiting": 26,
+                "oldest_wait_s": 7.2,
+                "refreshed_ok": 5
             },
             "calm": {
                 "waiting": 10,
-                "oldest_wait_s": 8,
+                "oldest_wait_s": 7.2,
                 "refreshed_ok": 0
             }
         },
         {
             "t": 8,
             "busy": {
-                "waiting": 30,
-                "oldest_wait_s": 9,
-                "refreshed_ok": 6
+                "waiting": 26,
+                "oldest_wait_s": 8.2,
+                "refreshed_ok": 5
             },
             "calm": {
                 "waiting": 10,
-                "oldest_wait_s": 9,
+                "oldest_wait_s": 8.2,
                 "refreshed_ok": 0
             }
         },
         {
             "t": 9,
             "busy": {
-                "waiting": 25,
-                "oldest_wait_s": 10,
+                "waiting": 22,
+                "oldest_wait_s": 9.2,
                 "refreshed_ok": 8
             },
             "calm": {
                 "waiting": 10,
-                "oldest_wait_s": 10,
+                "oldest_wait_s": 9.2,
                 "refreshed_ok": 0
             }
         },
         {
             "t": 10,
             "busy": {
-                "waiting": 21,
-                "oldest_wait_s": 11,
-                "refreshed_ok": 11
+                "waiting": 19,
+                "oldest_wait_s": 10.2,
+                "refreshed_ok": 10
             },
             "calm": {
                 "waiting": 10,
-                "oldest_wait_s": 11,
+                "oldest_wait_s": 10.2,
                 "refreshed_ok": 0
             }
         },
         {
             "t": 11,
             "busy": {
-                "waiting": 17,
-                "oldest_wait_s": 12,
-                "refreshed_ok": 13
+                "waiting": 15,
+                "oldest_wait_s": 11.2,
+                "refreshed_ok": 11
             },
             "calm": {
                 "waiting": 10,
-                "oldest_wait_s": 12,
+                "oldest_wait_s": 11.2,
                 "refreshed_ok": 0
             }
         },
@@ -251,47 +251,60 @@
             "t": 12,
             "busy": {
                 "waiting": 11,
-                "oldest_wait_s": 13,
-                "refreshed_ok": 15
+                "oldest_wait_s": 12.2,
+                "refreshed_ok": 13
             },
             "calm": {
                 "waiting": 10,
-                "oldest_wait_s": 13,
+                "oldest_wait_s": 12.2,
                 "refreshed_ok": 0
             }
         },
         {
             "t": 13,
             "busy": {
-                "waiting": 6,
-                "oldest_wait_s": 14,
-                "refreshed_ok": 18
+                "waiting": 11,
+                "oldest_wait_s": 13.2,
+                "refreshed_ok": 13
             },
             "calm": {
                 "waiting": 10,
-                "oldest_wait_s": 14,
+                "oldest_wait_s": 13.2,
                 "refreshed_ok": 0
             }
         },
         {
             "t": 14,
             "busy": {
-                "waiting": 3,
-                "oldest_wait_s": 15,
-                "refreshed_ok": 20
+                "waiting": 7,
+                "oldest_wait_s": 14.2,
+                "refreshed_ok": 15
             },
             "calm": {
-                "waiting": 4,
-                "oldest_wait_s": 15,
-                "refreshed_ok": 3
+                "waiting": 10,
+                "oldest_wait_s": 14.2,
+                "refreshed_ok": 0
             }
         },
         {
             "t": 15,
             "busy": {
-                "waiting": 0,
-                "oldest_wait_s": 0,
-                "refreshed_ok": 21
+                "waiting": 2,
+                "oldest_wait_s": 15.3,
+                "refreshed_ok": 17
+            },
+            "calm": {
+                "waiting": 10,
+                "oldest_wait_s": 15.3,
+                "refreshed_ok": 0
+            }
+        },
+        {
+            "t": 16,
+            "busy": {
+                "waiting": 2,
+                "oldest_wait_s": 16.3,
+                "refreshed_ok": 17
             },
             "calm": {
                 "waiting": 0,
