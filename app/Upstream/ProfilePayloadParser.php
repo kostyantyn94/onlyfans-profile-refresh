@@ -11,6 +11,7 @@ use Throwable;
  * InvalidProfilePayload. Nothing is written to the database before this passes.
  *
  * Accepted formats:
+ *  - OnlyFans:  {"id": 5140520, "username": "...", "favoritedCount": 612018, ...} (api2/v2/users)
  *  - Fans API:  {"data": {..., "favoritedCount": 611905}, "_meta": {"_cache": {"cached_at": "..."}}}
  *  - old:       {"likes": 120000, "revision": 10, ...}
  *  - new:       {"profile": {"likes": 121000, ...}, "revision": 11}
@@ -39,8 +40,8 @@ class ProfilePayloadParser
     ];
 
     /**
-     * @param  int  $fallbackRevision  used when a Fans API response carries no cache
-     *                                 timestamp: the time the request was sent (ms)
+     * @param  int  $fallbackRevision  the time the request was sent (ms): the revision of an
+     *                                 OnlyFans response, or of a Fans API one without a cache timestamp
      */
     public function parse(string $body, int $fallbackRevision): ProfileSnapshot
     {
@@ -62,9 +63,34 @@ class ProfilePayloadParser
             throw new InvalidProfilePayload('body is not a JSON object');
         }
 
-        return array_key_exists('data', $json)
-            ? $this->fromFansApi($json, $fallbackRevision)
-            : $this->fromRevisioned($json);
+        return match (true) {
+            array_key_exists('data', $json) => $this->fromFansApi($json, $fallbackRevision),
+            $this->isOnlyFansUser($json) => $this->fromOnlyFans($json, $fallbackRevision),
+            default => $this->fromRevisioned($json),
+        };
+    }
+
+    /**
+     * OnlyFans' user object has no revision. Of two responses for a profile, the
+     * one whose request was sent later carries the newer data, so the send time
+     * orders them.
+     */
+    private function fromOnlyFans(array $json, int $fallbackRevision): ProfileSnapshot
+    {
+        if (! array_key_exists('favoritedCount', $json)) {
+            throw new InvalidProfilePayload('favoritedCount (likes) is missing');
+        }
+
+        $likes = $this->wholeNumber($json['favoritedCount'], 'favoritedCount');
+
+        return new ProfileSnapshot($likes, $fallbackRevision, 'onlyfans', $this->attributes($json), $json);
+    }
+
+    private function isOnlyFansUser(array $json): bool
+    {
+        return array_key_exists('favoritedCount', $json)
+            || (array_key_exists('id', $json) && array_key_exists('username', $json)
+                && ! array_key_exists('likes', $json) && ! array_key_exists('profile', $json) && ! array_key_exists('revision', $json));
     }
 
     private function fromFansApi(array $json, int $fallbackRevision): ProfileSnapshot

@@ -9,7 +9,6 @@ use App\Refresh\RefreshScheduler;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redis;
-use Illuminate\Support\Str;
 use Laravel\Horizon\Contracts\MasterSupervisorRepository;
 
 /**
@@ -46,11 +45,15 @@ class CrashWorker extends Command
 
         Account::query()->where('slug', 'crash')->delete();
         $fake->del('fake-upstream:status:crash');
-        $token = 'fake-'.Str::random(32);
-        $fake->hset('fake-upstream:tokens', hash('sha256', $token), 'crash');
+        $fake->sadd('fake-upstream:accounts', 'crash');
         $fake->set('fake-upstream:scenario:crash', json_encode(['format' => 'new', 'likes' => 121_000, 'revision' => 11]));
 
-        $account = Account::query()->create(['slug' => 'crash', 'name' => 'Crash test', 'base_url' => config('refresh.fake_upstream_url'), 'api_key' => $token]);
+        $account = Account::query()->create([
+            'slug' => 'crash',
+            'name' => 'Crash test',
+            'driver' => Account::DRIVER_ONLYFANS,
+            'base_url' => rtrim(config('refresh.fake_upstream_url'), '/').'/crash',
+        ]);
         $profile = Profile::query()->create(['account_id' => $account->id, 'username' => 'crash-001']);
         $profile->forceFill(['likes_count' => 120_000, 'revision' => 10, 'last_success_at' => now()->subDay()])->save();
 

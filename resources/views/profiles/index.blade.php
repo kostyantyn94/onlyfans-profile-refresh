@@ -72,7 +72,7 @@
             @error('username')
                 <p class="field-error" id="username-error"><x-icon name="alert" :size="14" />{{ $message }}</p>
             @else
-                <p class="tool__hint">Adds the OnlyFans username to the Fans API account and queues its first refresh now.</p>
+                <p class="tool__hint">Adds the OnlyFans username to the onlyfans account (signed requests, guest session) and queues its first refresh now.</p>
             @enderror
         </form>
         @endunless

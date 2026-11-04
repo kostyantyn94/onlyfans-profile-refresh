@@ -35,6 +35,10 @@ abstract class TestCase extends BaseTestCase
         $this->refreshLog = storage_path('logs/refresh-test-'.getmypid().'.log');
         @unlink($this->refreshLog);
         config(['logging.channels.refresh.path' => $this->refreshLog]);
+
+        // Test accounts talk to https://upstream.test, which signs with made-up
+        // rules read from a fixture file (no rules are fetched over HTTP).
+        config(['services.onlyfans.rules_sources' => ['upstream.test' => ['resources/fixtures/upstream/onlyfans-test-rules.json']]]);
     }
 
     protected function fixture(string $name): string
@@ -42,12 +46,22 @@ abstract class TestCase extends BaseTestCase
         return file_get_contents(base_path('resources/fixtures/upstream/'.$name));
     }
 
+    /** An OnlyFans account (guest session) unless the attributes say otherwise. */
     protected function makeAccount(array $attributes = []): Account
     {
         return Account::query()->create([
             'slug' => 'acct-'.Str::lower(Str::random(6)),
             'name' => 'Test account',
+            'driver' => Account::DRIVER_ONLYFANS,
             'base_url' => 'https://upstream.test',
+            ...$attributes,
+        ]);
+    }
+
+    protected function makeFansApiAccount(array $attributes = []): Account
+    {
+        return $this->makeAccount([
+            'driver' => Account::DRIVER_FANSAPI,
             'api_key' => 'secret-key-'.Str::random(12),
             ...$attributes,
         ]);

@@ -37,11 +37,11 @@
                 </h1>
                 <p class="hero__meta">
                     <span class="mono">{{ '@'.$profile->username }}</span>
-                    <span class="tag" title="Upstream account (API key / team): {{ $profile->account->name }}">account {{ $profile->account->slug }}</span>
+                    <span class="tag" title="Upstream account ({{ $profile->account->driver }}): {{ $profile->account->name }}">account {{ $profile->account->slug }}</span>
                     @if ($profile->upstream_id)
                         <span>OnlyFans id <span class="mono">{{ $profile->upstream_id }}</span></span>
                     @endif
-                    @if ($profile->account->slug === 'fansapi')
+                    @if (in_array($profile->account->slug, ['onlyfans', 'fansapi'], true))
                         <a href="https://onlyfans.com/{{ rawurlencode($profile->username) }}" target="_blank" rel="noopener noreferrer">onlyfans.com <x-icon name="external" :size="13" /></a>
                     @endif
                 </p>
@@ -199,7 +199,7 @@
                     <dt>Stored revision</dt>
                     <dd>
                         <span @class(['milestone__main', 'mono' => $profile->revision !== null])>{{ $profile->revision ?? '—' }}</span>
-                        <span class="milestone__sub">{{ $revisionTime ? 'Fans API snapshot of '.$revisionTime->format('M j, Y H:i:s T') : 'only a newer revision can overwrite it' }}</span>
+                        <span class="milestone__sub">{{ $revisionTime ? ($profile->account->driver === 'fansapi' ? 'Fans API snapshot of ' : 'OnlyFans request sent at ').$revisionTime->format('M j, Y H:i:s T') : 'only a newer revision can overwrite it' }}</span>
                     </dd>
                 </div>
             </dl>

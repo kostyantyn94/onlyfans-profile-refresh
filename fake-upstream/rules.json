@@ -1,0 +1,8 @@
+{
+  "static_param": "FakeUpstreamStaticParamXyz012345",
+  "format": "54321:{}:{:x}:fa4e0001",
+  "checksum_constant": -128,
+  "checksum_indexes": [1, 2, 3, 5, 8, 13, 21, 34, 0, 4, 9, 16, 25, 36, 7, 14, 28, 35, 6, 12, 18, 24, 30, 39, 10, 20, 11, 22, 33, 15, 26, 37],
+  "app_token": "fa4e0000fa4e0000fa4e0000fa4e0000",
+  "remove_headers": []
+}

@@ -60,11 +60,11 @@ class ProfileController extends Controller
         ]);
     }
 
-    /** Start tracking a username on the Fans API account and refresh it now. */
+    /** Start tracking a username on the OnlyFans account and refresh it now. */
     public function store(Request $request, RefreshScheduler $scheduler): RedirectResponse
     {
         $data = $request->validate(['username' => ['required', 'string', 'max:64', 'regex:/^@?[A-Za-z0-9_.-]+$/']]);
-        $account = Account::query()->where('slug', 'fansapi')->firstOrFail();
+        $account = Account::query()->where('slug', 'onlyfans')->firstOrFail();
 
         $profile = Profile::query()->createOrFirst([
             'account_id' => $account->id,

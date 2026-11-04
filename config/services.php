@@ -35,6 +35,37 @@ return [
         ],
     ],
 
+    // Direct requests to onlyfans.com/api2/v2, signed by App\Upstream\OnlyFans\RequestSigner.
+    'onlyfans' => [
+        'base_url' => env('ONLYFANS_BASE_URL', 'https://onlyfans.com'),
+
+        // Where the current signing rules come from, per upstream host. A source
+        // is a URL or a local JSON file; they are tried in order, and rules that
+        // OnlyFans keeps rejecting are skipped (see SigningRulesProvider).
+        'rules_sources' => [
+            'onlyfans.com' => array_values(array_filter(explode(',', (string) env('ONLYFANS_RULES_SOURCES',
+                'https://raw.githubusercontent.com/rafa-9/dynamic-rules/main/rules.json,'
+                .'https://raw.githubusercontent.com/DATAHOARDERS/dynamic-rules/main/onlyfans.json,'
+                .'https://raw.githubusercontent.com/datawhores/onlyfans-dynamic-rules/main/dynamicRules.json,'
+                .'https://raw.githubusercontent.com/riley-access-labs/onlyfans-dynamic-rules-1/main/dynamicRules.json')))),
+            // The local fake upstream signs with its own test rules.
+            parse_url((string) env('FAKE_UPSTREAM_URL', 'http://fake-upstream:8080'), PHP_URL_HOST) => [
+                rtrim((string) env('FAKE_UPSTREAM_URL', 'http://fake-upstream:8080'), '/').'/rules.json',
+            ],
+        ],
+        // Loaded rules are reused this long; a rejected signature reloads them sooner.
+        'rules_ttl_minutes' => (int) env('ONLYFANS_RULES_TTL_MINUTES', 60),
+        // Rules rejected this many times (each time with a new session) are
+        // skipped for rules_skip_minutes in favour of the next source.
+        'rules_reject_limit' => 2,
+        'rules_skip_minutes' => 30,
+
+        // Sent with every request of a session; OnlyFans ties the session to it.
+        'user_agent' => env('ONLYFANS_USER_AGENT', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36'),
+        // A guest session (x-bc token and the cookies OnlyFans sets) is kept this long.
+        'session_ttl_hours' => (int) env('ONLYFANS_SESSION_TTL_HOURS', 24),
+    ],
+
     'fansapi' => [
         'base_url' => env('FANSAPI_BASE_URL', 'https://app.onlyfansapi.com'),
         'key' => env('FANSAPI_KEY'),

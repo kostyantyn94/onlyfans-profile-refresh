@@ -7,7 +7,6 @@ use App\Refresh\RefreshScheduler;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redis;
-use Illuminate\Support\Str;
 use Laravel\Horizon\Contracts\MasterSupervisorRepository;
 
 /**
@@ -40,15 +39,14 @@ class MeasureThroughput extends Command
 
         Account::query()->where('slug', 'bench')->delete();
         $fake->del('fake-upstream:status:bench', 'fake-upstream:requests:bench');
-        $token = 'fake-'.Str::random(32);
-        $fake->hset('fake-upstream:tokens', hash('sha256', $token), 'bench');
+        $fake->sadd('fake-upstream:accounts', 'bench');
         $fake->set('fake-upstream:scenario:bench', json_encode(['format' => 'new', 'latency_ms' => (int) $this->option('latency')]));
 
         $account = Account::query()->create([
             'slug' => 'bench',
             'name' => 'Throughput benchmark',
-            'base_url' => config('refresh.fake_upstream_url'),
-            'api_key' => $token,
+            'driver' => Account::DRIVER_ONLYFANS,
+            'base_url' => rtrim(config('refresh.fake_upstream_url'), '/').'/bench',
             'max_concurrency' => (int) $this->option('concurrency'),
         ]);
 

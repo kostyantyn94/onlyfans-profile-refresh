@@ -11,6 +11,7 @@ use Illuminate\Queue\MaxAttemptsExceededException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\DataProvider;
+use RuntimeException;
 use Tests\TestCase;
 
 /** Behaviour of the fixed refresh job (RefreshProfile) beyond the incident cases. */
@@ -24,7 +25,10 @@ class RefreshJobTest extends TestCase
 
     public function test_real_fans_api_response_stores_the_full_profile(): void
     {
-        $profile = $this->profileWithValidData(attributes: ['likes_count' => null, 'revision' => null, 'name' => null]);
+        // Shortly after the fixture was cached by Fans API (08:12:09 UTC), so
+        // the cached answer is recent enough to be a refresh.
+        $this->travelTo(CarbonImmutable::parse('2026-11-01 08:30:00 UTC'));
+        $profile = $this->profileWithValidData($this->makeFansApiAccount(), ['likes_count' => null, 'revision' => null, 'name' => null]);
         Http::fake(['upstream.test/api/profiles/*' => Http::response($this->fixture('fansapi-madison420ivy.json'))]);
 
         $this->runRefresh($profile);
@@ -46,7 +50,7 @@ class RefreshJobTest extends TestCase
 
     public function test_the_account_key_falls_back_to_the_environment(): void
     {
-        $profile = $this->profileWithValidData($this->makeAccount(['api_key' => null]));
+        $profile = $this->profileWithValidData($this->makeFansApiAccount(['api_key' => null]));
         Http::fake(['*' => Http::response($this->fixture('new-format.json'))]);
 
         $this->runRefresh($profile);
@@ -253,7 +257,7 @@ class RefreshJobTest extends TestCase
     {
         // The fixture was cached by Fans API at 2026-11-01 08:12:09 UTC.
         $this->travelTo(CarbonImmutable::parse('2026-11-01 20:00:00 UTC'));
-        $profile = $this->profileWithValidData(attributes: ['likes_count' => null, 'revision' => null]);
+        $profile = $this->profileWithValidData($this->makeFansApiAccount(), ['likes_count' => null, 'revision' => null]);
         $live = json_decode($this->fixture('fansapi-madison420ivy.json'), true);
         $live['data']['favoritedCount'] = 612_000;
         $live['_meta']['_cache'] = ['is_cached' => false, 'cached_at' => '2026-11-01T20:00:00+00:00'];
@@ -274,13 +278,106 @@ class RefreshJobTest extends TestCase
     public function test_a_recent_cached_snapshot_is_used_as_is(): void
     {
         $this->travelTo(CarbonImmutable::parse('2026-11-01 08:30:00 UTC'));
-        $profile = $this->profileWithValidData(attributes: ['likes_count' => null, 'revision' => null]);
+        $profile = $this->profileWithValidData($this->makeFansApiAccount(), ['likes_count' => null, 'revision' => null]);
         Http::fake(['*' => Http::response($this->fixture('fansapi-madison420ivy.json'))]);
 
         $this->runRefresh($profile);
 
         Http::assertSentCount(1);
         $this->assertSame(611_905, $profile->refresh()->likes_count);
+    }
+
+    public function test_a_fresh_request_that_still_returns_an_old_snapshot_is_not_stored(): void
+    {
+        // Review finding: the answer to ?fresh=true was stored without checking its age.
+        $this->travelTo(CarbonImmutable::parse('2026-11-01 20:00:00 UTC'));
+        $profile = $this->profileWithValidData($this->makeFansApiAccount());
+        $lastSuccess = $profile->last_success_at->timestamp;
+        Http::fake(['*' => Http::response($this->fixture('fansapi-madison420ivy.json'))]);
+
+        $job = $this->runRefresh($profile);
+
+        $recorded = Http::recorded();
+        $this->assertCount(2, $recorded);
+        $this->assertStringContainsString('fresh=true', $recorded[1][0]->url());
+        $this->assertSame(['cache_too_old', 'cache_still_too_old'], RefreshAttempt::query()->orderBy('id')->pluck('outcome')->all());
+        $profile->refresh();
+        $this->assertSame([120_000, 10], [$profile->likes_count, $profile->revision], 'the old snapshot is not written');
+        $this->assertSame($lastSuccess, $profile->last_success_at->timestamp);
+        $this->assertSame('cache_still_too_old', $profile->last_attempt_status);
+        $this->assertTrue($job->job->isReleased(), 'retried later with backoff');
+        $this->assertNotNull($profile->pending_refresh_id, 'the refresh keeps its claim');
+    }
+
+    public function test_no_live_request_is_sent_when_it_would_exceed_the_attempt_budget(): void
+    {
+        // Review finding: the ?fresh=true follow-up could be an 11th call.
+        $this->travelTo(CarbonImmutable::parse('2026-11-01 20:00:00 UTC'));
+        $profile = $this->profileWithValidData($this->makeFansApiAccount());
+        $refreshId = (string) Str::uuid();
+        $this->previousAttempts($profile, $refreshId, 'rate_limited', 7);
+        $this->previousAttempts($profile, $refreshId, 'timeout', 2);
+        Http::fake(['*' => Http::response($this->fixture('fansapi-madison420ivy.json'))]);
+
+        $job = $this->runRefresh($profile, $refreshId);
+
+        Http::assertSentCount(1);
+        $this->assertSame(config('refresh.max_upstream_attempts'), RefreshAttempt::query()->count());
+        $profile->refresh();
+        $this->assertSame(120_000, $profile->likes_count);
+        $this->assertSame('cache_too_old', $profile->last_attempt_status);
+        $this->assertNull($profile->pending_refresh_id, 'a failed refresh: the claim is released');
+        $this->assertFalse($job->job->isReleased());
+    }
+
+    public function test_a_redelivered_job_with_no_attempts_left_does_not_call_the_upstream(): void
+    {
+        $profile = $this->profileWithValidData();
+        $refreshId = (string) Str::uuid();
+        $this->previousAttempts($profile, $refreshId, 'rate_limited', 8);
+        $this->previousAttempts($profile, $refreshId, 'timeout', 2);
+        Http::fake();
+
+        $this->runRefresh($profile, $refreshId);
+
+        Http::assertNothingSent();
+        $this->assertSame(10, RefreshAttempt::query()->count());
+        $profile->refresh();
+        $this->assertSame('gave_up', $profile->last_attempt_status);
+        $this->assertNull($profile->pending_refresh_id);
+        $this->assertSame(120_000, $profile->likes_count);
+    }
+
+    public static function writesWithTheirAttempt(): array
+    {
+        return [
+            'a successful write' => [200],
+            'a recorded failure' => [500],
+        ];
+    }
+
+    #[DataProvider('writesWithTheirAttempt')]
+    public function test_a_profile_write_and_its_attempt_row_commit_together(int $status): void
+    {
+        // Review finding: the profile update and the attempt row were separate commits.
+        $profile = $this->profileWithValidData();
+        $refreshId = (string) Str::uuid();
+        Http::fake(['*' => $status === 200 ? Http::response($this->fixture('new-format.json')) : Http::response('', 500)]);
+        RefreshAttempt::creating(fn () => throw new RuntimeException('database went away'));
+
+        try {
+            $this->runRefresh($profile, $refreshId);
+            $this->fail('the job should have thrown');
+        } catch (RuntimeException $e) {
+            $this->assertSame('database went away', $e->getMessage());
+        }
+
+        $profile->refresh();
+        $this->assertSame([120_000, 10], [$profile->likes_count, $profile->revision], 'nothing written without its attempt row');
+        $this->assertSame('success', $profile->last_attempt_status);
+        $this->assertNull($profile->last_failure_at);
+        $this->assertSame($refreshId, $profile->pending_refresh_id, 'the claim stays, so the redelivery redoes the attempt');
+        $this->assertSame(0, RefreshAttempt::query()->count());
     }
 
     public function test_the_same_revision_with_different_likes_corrects_the_stored_row(): void
@@ -387,7 +484,8 @@ class RefreshJobTest extends TestCase
 
     public function test_logs_follow_a_refresh_and_never_contain_the_key(): void
     {
-        $profile = $this->profileWithValidData();
+        // The OnlyFans session's secrets: OnlyFansClientTest.
+        $profile = $this->profileWithValidData($this->makeFansApiAccount());
         $refreshId = (string) Str::uuid();
         Http::fake(['*' => Http::sequence()->push('', 429)->push($this->fixture('new-format.json'))]);
 

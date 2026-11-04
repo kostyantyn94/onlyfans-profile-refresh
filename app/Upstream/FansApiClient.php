@@ -9,9 +9,10 @@ use Illuminate\Support\Facades\Http;
 /**
  * GET {base_url}/api/profiles/{username} — Fans API "Get Profile Details"
  * (https://docs.onlyfansapi.com/api-reference/public-profiles/get-profile-details).
- * The local fake upstream serves the same path.
+ * The managed alternative to OnlyFansClient, for accounts with the "fansapi"
+ * driver; the first version of this service used only this.
  */
-class FansApiClient
+class FansApiClient implements ProfileClient
 {
     /**
      * Never throws for an HTTP status; the caller decides what each status means.

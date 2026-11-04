@@ -1,0 +1,23 @@
+# Regression tests for the three reliability gaps from the review (4 Nov 2026).
+# 1) Before the fix: app/ and config/ stashed, the new tests run against the reviewed code.
+$ git stash push -- app config && php artisan test --filter='fresh_request_that_still|exceed_the_attempt_budget|no_attempts_left|commit_together'
+  ⨯ a fresh request that still returns an old snapshot is not stored     0.40s  
+  ⨯ no live request is sent when it would exceed the attempt budget      0.11s  
+  ⨯ a redelivered job with no attempts left does not call the upstream   0.10s  
+  ⨯ a profile write and its attempt row commit together with data set "… 0.11s  
+  ⨯ a profile write and its attempt row commit together with data set "… 0.08s  
+  Tests:    5 failed (10 assertions)
+
+# 2) After the fix, same tests:
+$ php artisan test --filter='fresh_request_that_still|exceed_the_attempt_budget|no_attempts_left|commit_together'
+  ✓ a fresh request that still returns an old snapshot is not stored     0.38s  
+  ✓ no live request is sent when it would exceed the attempt budget      0.08s  
+  ✓ a redelivered job with no attempts left does not call the upstream   0.09s  
+  ✓ a profile write and its attempt row commit together with data set "… 0.09s  
+  ✓ a profile write and its attempt row commit together with data set "… 0.09s  
+  Tests:    5 passed (31 assertions)
+
+# 3) Full suite after the fix:
+$ php artisan test
+  Tests:    109 passed (4378 assertions)
+  Duration: 12.51s

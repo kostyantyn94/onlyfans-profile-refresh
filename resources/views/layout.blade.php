@@ -22,7 +22,7 @@
             <span class="brand__mark"><x-icon name="refresh" :size="17" /></span>
             <span class="brand__text">
                 <span class="brand__name">Profile Refresher</span>
-                <span class="brand__sub">OnlyFans profiles via the Fans API</span>
+                <span class="brand__sub">OnlyFans profiles, signed api2 requests</span>
             </span>
         </a>
         <nav class="topnav" aria-label="Main">

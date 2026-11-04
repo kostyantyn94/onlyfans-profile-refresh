@@ -11,5 +11,7 @@ final readonly class UpstreamResponse
         // When the request was sent, in Unix milliseconds.
         public int $sentAtMs,
         public int $durationMs,
+        // OnlyFans refused the request signature ("Please refresh the page").
+        public bool $signatureRejected = false,
     ) {}
 }

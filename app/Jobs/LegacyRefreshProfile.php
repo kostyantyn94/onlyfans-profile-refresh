@@ -4,10 +4,12 @@ namespace App\Jobs;
 
 use App\Models\Profile;
 use App\Models\RefreshAttempt;
+use App\Upstream\UpstreamClients;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
-use Illuminate\Support\Facades\Http;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Sleep;
 
 /**
  * The refresh handler as it was during the incident, kept only to reproduce
@@ -16,8 +18,11 @@ use Illuminate\Support\Facades\Log;
  *  - reads `likes` from the top level only and turns a missing value into 0;
  *  - marks every response as a successful refresh, including 429 and 500;
  *  - writes whatever revision arrives, so a late old response wins;
- *  - retries inside the job with sleeps (Http::retry), holding a worker while
- *    a rate-limited account waits, so other accounts queue behind it.
+ *  - retries inside the job with sleeps (as Http::retry does), holding a worker
+ *    while a rate-limited account waits, so other accounts queue behind it.
+ *
+ * It calls the upstream through the same client as the fixed job, so before and
+ * after are measured against the same requests.
  */
 class LegacyRefreshProfile implements ShouldQueue
 {
@@ -33,23 +38,40 @@ class LegacyRefreshProfile implements ShouldQueue
         $this->onQueue(config('refresh.queue'));
     }
 
-    public function handle(): void
+    public function handle(UpstreamClients $clients): void
     {
         $profile = Profile::query()->with('account')->findOrFail($this->profileId);
+        $client = $clients->for($profile->account);
+        $tries = (int) config('refresh.legacy.tries');
         $started = hrtime(true);
 
-        $response = Http::baseUrl($profile->account->base_url)
-            ->withToken((string) $profile->account->credential())
-            ->acceptJson()
-            ->timeout(10)
-            ->retry((int) config('refresh.legacy.tries'), (int) config('refresh.legacy.sleep_ms'), throw: false)
-            ->get('api/profiles/'.$profile->username);
+        for ($try = 1; ; $try++) {
+            try {
+                $response = $client->fetchProfile($profile->account, $profile->username);
+            } catch (ConnectionException $e) {
+                if ($try >= $tries) {
+                    throw $e;
+                }
 
-        $likes = $response->json('likes') ?? 0;
+                Sleep::for((int) config('refresh.legacy.sleep_ms'))->milliseconds();
+
+                continue;
+            }
+
+            if (($response->status >= 200 && $response->status < 300) || $try >= $tries) {
+                break;
+            }
+
+            Sleep::for((int) config('refresh.legacy.sleep_ms'))->milliseconds();
+        }
+
+        $json = json_decode($response->body, true);
+        $likes = $json['likes'] ?? 0;
+        $revision = $json['revision'] ?? null;
 
         $profile->forceFill([
             'likes_count' => $likes,
-            'revision' => $response->json('revision'),
+            'revision' => $revision,
             'last_attempt_at' => now(),
             'last_attempt_status' => 'success',
             'last_success_at' => now(),
@@ -66,8 +88,8 @@ class LegacyRefreshProfile implements ShouldQueue
             'job_attempt' => $this->job ? $this->attempts() : null,
             'handler' => 'legacy',
             'outcome' => 'success',
-            'http_status' => $response->status(),
-            'revision' => $response->json('revision'),
+            'http_status' => $response->status,
+            'revision' => $revision,
             'likes' => $likes,
             'duration_ms' => (int) ((hrtime(true) - $started) / 1_000_000),
         ]);
@@ -77,7 +99,7 @@ class LegacyRefreshProfile implements ShouldQueue
             'profile_id' => $profile->id,
             'account_id' => $profile->account_id,
             'handler' => 'legacy',
-            'http_status' => $response->status(),
+            'http_status' => $response->status,
             'likes' => $likes,
         ]);
     }

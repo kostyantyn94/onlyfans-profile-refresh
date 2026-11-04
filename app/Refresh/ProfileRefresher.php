@@ -5,13 +5,15 @@ namespace App\Refresh;
 use App\Jobs\RefreshProfile;
 use App\Models\Profile;
 use App\Models\RefreshAttempt;
-use App\Upstream\FansApiClient;
 use App\Upstream\InvalidProfilePayload;
+use App\Upstream\OnlyFans\SigningRulesUnavailable;
 use App\Upstream\ProfilePayloadParser;
 use App\Upstream\ProfileSnapshot;
+use App\Upstream\UpstreamClients;
 use App\Upstream\UpstreamResponse;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
 use Throwable;
@@ -23,7 +25,7 @@ use Throwable;
 class ProfileRefresher
 {
     public function __construct(
-        private FansApiClient $client,
+        private UpstreamClients $clients,
         private ProfilePayloadParser $parser,
         private ProfileStore $store,
         private AccountThrottle $throttle,
@@ -51,35 +53,66 @@ class ProfileRefresher
         $attempt = RefreshAttempt::query()->where('refresh_id', $job->refreshId)->count() + 1;
         $context = $this->context($job, $profile, $attempt);
 
-        $result = $this->fetchValid($job, $profile, $attempt, $context, fresh: false);
+        if ($attempt > $this->attemptBudget()) {
+            // Only reachable through a redelivery (a worker died after recording
+            // its last attempt): the budget is checked before every call.
+            $this->budgetUsedUp($job, $profile, $context);
 
-        if ($result === null) {
             return;
         }
 
-        [$response, $snapshot] = $result;
+        $fresh = (bool) config('services.fansapi.fresh');
 
-        if ($this->cacheTooOld($snapshot)) {
-            // Fans API answered from a cached snapshot older than we accept: that
-            // is not a refresh. Record it and ask once more for live data.
-            $this->recordAttempt($job, $profile, $attempt, Outcome::CacheTooOld, $response, revision: $snapshot->revision, likes: $snapshot->likes);
-            Log::channel('refresh')->info('refresh.cache_too_old', [...$context, 'cached_at' => $snapshot->cachedAt->toIso8601String()]);
-
-            $context['upstream_attempt'] = ++$attempt;
-            $result = $this->fetchValid($job, $profile, $attempt, $context, fresh: true);
+        // Every response goes through the same checks, the follow-up included;
+        // the loop runs at most twice (cache first, then live data once).
+        while (true) {
+            $result = $this->fetchValid($job, $profile, $attempt, $context, $fresh);
 
             if ($result === null) {
                 return;
             }
 
             [$response, $snapshot] = $result;
+
+            if (! $this->cacheTooOld($snapshot)) {
+                break;
+            }
+
+            $reason = 'snapshot cached at '.$snapshot->cachedAt->toIso8601String().' is older than '
+                .config('services.fansapi.max_cache_age_minutes').' min';
+
+            if ($fresh) {
+                $this->failed($job, $profile, $attempt, Outcome::CacheStillTooOld, $reason.' even with ?fresh=true', $response, $context);
+
+                return;
+            }
+
+            if ($attempt >= $this->attemptBudget()) {
+                // No attempt left for the live request: a failed refresh, never a stale success.
+                $this->failed($job, $profile, $attempt, Outcome::CacheTooOld, $reason.'; no attempt left to ask for live data', $response, $context);
+
+                return;
+            }
+
+            // Fans API answered from a cached snapshot older than we accept: that
+            // is not a refresh. Record it and ask once more for live data.
+            $this->recordAttempt($job, $profile, $attempt, Outcome::CacheTooOld, $response, revision: $snapshot->revision, likes: $snapshot->likes);
+            Log::channel('refresh')->info('refresh.cache_too_old', [...$context, 'cached_at' => $snapshot->cachedAt->toIso8601String()]);
+
+            $context['upstream_attempt'] = ++$attempt;
+            $fresh = true;
         }
 
         $this->crashForTest($job, 'before-write', $context);
 
-        $outcome = $this->store->apply($profile, $snapshot, $job->refreshId, CarbonImmutable::now());
+        // The profile write and the attempt that produced it commit together: a
+        // crash leaves either both or neither, never data without its audit row.
+        $outcome = DB::transaction(function () use ($job, $profile, $snapshot, $attempt, $response) {
+            $outcome = $this->store->apply($profile, $snapshot, $job->refreshId, CarbonImmutable::now());
+            $this->recordAttempt($job, $profile, $attempt, $outcome, $response, revision: $snapshot->revision, likes: $snapshot->likes);
 
-        $this->recordAttempt($job, $profile, $attempt, $outcome, $response, revision: $snapshot->revision, likes: $snapshot->likes);
+            return $outcome;
+        });
 
         Log::channel('refresh')->info('refresh.'.$outcome->value, [
             ...$context,
@@ -104,9 +137,21 @@ class ProfileRefresher
     private function fetchValid(RefreshProfile $job, Profile $profile, int $attempt, array $context, bool $fresh): ?array
     {
         try {
-            $response = $this->client->fetchProfile($profile->account, $profile->username, $fresh);
+            $response = $this->clients->for($profile->account)->fetchProfile($profile->account, $profile->username, $fresh);
         } catch (ConnectionException $e) {
             $this->failed($job, $profile, $attempt, Outcome::Timeout, $this->clean($e->getMessage()), null, $context);
+
+            return null;
+        } catch (SigningRulesUnavailable $e) {
+            // Recorded as an attempt although nothing was sent, so the retry
+            // budget bounds how long a refresh waits for usable rules.
+            $this->failed($job, $profile, $attempt, Outcome::RulesUnavailable, $e->getMessage(), null, $context);
+
+            return null;
+        }
+
+        if ($response->signatureRejected) {
+            $this->failed($job, $profile, $attempt, Outcome::SignatureRejected, 'HTTP 400: OnlyFans rejected the request signature', $response, $context);
 
             return null;
         }
@@ -130,8 +175,22 @@ class ProfileRefresher
     private function cacheTooOld(ProfileSnapshot $snapshot): bool
     {
         return $snapshot->cachedAt !== null
-            && ! config('services.fansapi.fresh')
             && $snapshot->cachedAt->lt(CarbonImmutable::now()->subMinutes((int) config('services.fansapi.max_cache_age_minutes')));
+    }
+
+    /** Upstream calls allowed per refresh, follow-ups included. */
+    private function attemptBudget(): int
+    {
+        return (int) config('refresh.max_upstream_attempts');
+    }
+
+    /** The refresh has no upstream attempt left: finish it as failed without calling. */
+    private function budgetUsedUp(RefreshProfile $job, Profile $profile, array $context): void
+    {
+        $reason = 'all '.$this->attemptBudget().' upstream attempts used';
+        $this->store->recordFailure($profile, Outcome::GaveUp, $reason, $job->refreshId, true, CarbonImmutable::now());
+
+        Log::channel('refresh')->error('refresh.failed', [...$context, 'outcome' => Outcome::GaveUp->value, 'reason' => $reason, 'final' => true]);
     }
 
     /** The job kept throwing or crashing its worker: finish the refresh as failed. */
@@ -166,14 +225,16 @@ class ProfileRefresher
 
         $final = ! $outcome->isRetryable()
             || $sameKind >= config('refresh.retry.'.$outcome->value.'.max')
-            || $attempt >= (int) config('refresh.max_upstream_attempts');
+            || $attempt >= $this->attemptBudget();
 
         if ($final) {
             $delay = null;
         }
 
-        $this->store->recordFailure($profile, $outcome, $reason, $job->refreshId, $final, $now);
-        $this->recordAttempt($job, $profile, $attempt, $outcome, $response, retryIn: $delay, error: $reason);
+        DB::transaction(function () use ($job, $profile, $attempt, $outcome, $reason, $response, $final, $delay, $now) {
+            $this->store->recordFailure($profile, $outcome, $reason, $job->refreshId, $final, $now);
+            $this->recordAttempt($job, $profile, $attempt, $outcome, $response, retryIn: $delay, error: $reason);
+        });
 
         Log::channel('refresh')->log($final ? 'error' : 'warning', $final ? 'refresh.failed' : 'refresh.retry_scheduled', [
             ...$context,

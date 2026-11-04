@@ -6,6 +6,7 @@ use App\Models\Account;
 use App\Models\Profile;
 use App\Models\RefreshAttempt;
 use App\Refresh\RefreshScheduler;
+use App\Upstream\OnlyFans\SessionStore;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -34,6 +35,7 @@ class RunWorkload extends Command
         {--error-every=10 : Every Nth busy request gets HTTP 500 with an empty body (0 = never)}
         {--format=mixed : Upstream format: old, new, mixed (alternating) or fansapi}
         {--latency=50 : Milliseconds added to every upstream response}
+        {--rotate-rules=0 : Seconds after the start when the fake upstream switches to new signing rules (0 = never)}
         {--timeout=180 : Stop waiting after this many seconds}';
 
     protected $description = 'Run the two-account workload through Horizon and report what happened';
@@ -80,6 +82,10 @@ class RunWorkload extends Command
             ]),
         ];
 
+        if (($rotate = (float) $this->option('rotate-rules')) > 0) {
+            $fake->set('fake-upstream:rotate_rules_at', (string) ($start + $rotate));
+        }
+
         $profiles = [
             'busy' => $this->makeProfiles($accounts['busy'], (int) $this->option('busy')),
             'calm' => $this->makeProfiles($accounts['calm'], (int) $this->option('calm')),
@@ -108,6 +114,8 @@ class RunWorkload extends Command
                 'busy_empty_500_every' => (int) $this->option('error-every'),
                 'format' => $this->option('format'),
                 'latency_ms' => (int) $this->option('latency'),
+                'client' => 'onlyfans: signed api2 requests, guest session',
+                'signing_rules_rotated_after_s' => (float) $this->option('rotate-rules') ?: null,
                 'horizon_refresh_workers' => (int) config('horizon.environments.local.refresh.maxProcesses'),
                 'account_concurrency' => (int) config('refresh.account_concurrency'),
                 'legacy_retry' => $handler === 'legacy' ? config('refresh.legacy') : null,
@@ -151,19 +159,26 @@ class RunWorkload extends Command
         foreach ($fake->keys('fake-upstream:*') as $key) {
             $fake->del($key);
         }
+
+        // Signing rules (and rejection counts) left from an earlier run, which
+        // may have rotated the fake upstream's rules.
+        $cache = Redis::connection('cache');
+        foreach ($cache->keys('*onlyfans:rules*') as $key) {
+            $cache->del(Str::after($key, $prefix));
+        }
     }
 
+    /** An OnlyFans account (guest session) on the fake upstream, which knows it by its path prefix. */
     private function makeAccount(string $slug, $fake, array $scenario): Account
     {
-        $token = 'fake-'.Str::random(32);
-        $fake->hset('fake-upstream:tokens', hash('sha256', $token), $slug);
+        $fake->sadd('fake-upstream:accounts', $slug);
         $fake->set('fake-upstream:scenario:'.$slug, json_encode($scenario));
 
         return Account::query()->create([
             'slug' => $slug,
             'name' => ucfirst($slug).' account (workload)',
-            'base_url' => config('refresh.fake_upstream_url'),
-            'api_key' => $token,
+            'driver' => Account::DRIVER_ONLYFANS,
+            'base_url' => rtrim(config('refresh.fake_upstream_url'), '/').'/'.$slug,
         ]);
     }
 
@@ -267,8 +282,10 @@ class RunWorkload extends Command
         return [
             'refreshes_queued' => $profiles->count(),
             'refreshes_finished' => $profiles->whereNull('refresh_queued_at')->count(),
+            // last_success_at has whole seconds: compare with the start's second,
+            // or refreshes done within that first second are missed.
             'reported_successful' => $profiles->filter(fn ($p) => in_array($p->last_attempt_status, ['success', 'unchanged'], true)
-                && $p->last_success_at?->gte($startedAt))->count(),
+                && $p->last_success_at?->gte($startedAt->startOfSecond()))->count(),
             'verified_successful' => $verified,
             'kept_last_valid_data' => $kept,
             'wrong_data' => $profiles->count() - $verified - $kept,
@@ -285,13 +302,20 @@ class RunWorkload extends Command
         ];
     }
 
+    /** Occurrences of the accounts' session tokens (x-bc, cookies) or keys in the logs. */
     private function secretsInLogs(array $accounts, int $offset): int
     {
         $path = storage_path('logs/refresh.log');
         $log = is_file($path) ? (string) file_get_contents($path, offset: $offset) : '';
         $log .= is_file(storage_path('logs/laravel.log')) ? (string) file_get_contents(storage_path('logs/laravel.log')) : '';
 
-        return collect($accounts)->sum(fn (Account $account) => substr_count($log, (string) $account->api_key));
+        $secrets = collect($accounts)->flatMap(function (Account $account) {
+            $session = app(SessionStore::class)->for($account);
+
+            return [$account->api_key, $session->xBc, ...array_values($session->cookies)];
+        })->filter()->unique();
+
+        return $secrets->sum(fn (string $secret) => substr_count($log, $secret));
     }
 
     private function printReport(array $report): void
@@ -310,6 +334,6 @@ class RunWorkload extends Command
 
         $this->table(['metric', 'busy', 'calm'], $rows);
         $this->line("Failed jobs in Horizon during the run: {$report['failed_jobs']}");
-        $this->line("API keys found in logs: {$report['secrets_in_logs']}");
+        $this->line("Session tokens or keys found in logs: {$report['secrets_in_logs']}");
     }
 }

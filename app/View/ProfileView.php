@@ -25,7 +25,7 @@ final class ProfileView
         return match (true) {
             $case === null => 'bad',
             $case->isSuccess() => 'good',
-            $case->isRetryable(), $case === Outcome::Stale => 'warn',
+            $case->isRetryable(), $case === Outcome::Stale, $case === Outcome::CacheTooOld => 'warn',
             default => 'bad',
         };
     }
@@ -38,12 +38,16 @@ final class ProfileView
             'success' => 'Valid response with a newer revision: data written',
             'unchanged' => 'Valid response, same revision as stored: data confirmed',
             'stale_ignored' => 'An older revision arrived late: ignored, data kept',
+            'cache_too_old' => 'Fans API answered from an old cache: asked again for live data',
+            'cache_still_too_old' => 'Live data was asked for and the snapshot was still old: not stored, retried later',
+            'signature_rejected' => 'OnlyFans refused the request signature: rules reloaded, new session, retried',
+            'rules_unavailable' => 'No usable signing rules: nothing sent, retried later',
             'rate_limited' => 'HTTP 429: the account pauses, the refresh retries later',
             'server_error' => 'HTTP 5xx: retried with backoff, data kept',
             'timeout' => 'Timeout, 408 or 504: retried with backoff, data kept',
             'invalid_response' => 'The response failed validation: data kept',
             'not_found' => 'HTTP 404 or 410: the profile was not found upstream',
-            'auth_failed' => 'HTTP 401 or 403: the API key was refused',
+            'auth_failed' => 'HTTP 401 or 403: the session or API key was refused',
             'client_error' => 'Another HTTP 4xx: failed at once, data kept',
             'gave_up' => 'Retries ran out or the job kept failing',
             default => 'Unknown outcome',
@@ -212,7 +216,7 @@ final class ProfileView
         return trim(preg_replace("/[ \t]*\n[ \t]*(\n[ \t]*)+/", "\n\n", $text));
     }
 
-    /** Fans API revisions are snapshot times in ms; the workload uses small integers. */
+    /** OnlyFans revisions are request times and Fans API ones snapshot times, in ms; the workload uses small integers. */
     public static function revisionTime(?int $revision): ?Carbon
     {
         return $revision !== null && $revision > 1_000_000_000_000 ? Carbon::createFromTimestampMs($revision, 'UTC') : null;

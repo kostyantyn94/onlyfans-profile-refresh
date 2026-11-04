@@ -31,6 +31,8 @@
         <!-- Never the real key; Http::preventStrayRequests() blocks real calls anyway. -->
         <env name="FANSAPI_KEY" value="test-key-0000" force="true"/>
         <env name="FANSAPI_BASE_URL" value="https://upstream.test" force="true"/>
+        <!-- Seeded OnlyFans accounts point here too; TestCase gives the host made-up signing rules. -->
+        <env name="ONLYFANS_BASE_URL" value="https://upstream.test" force="true"/>
         <!-- Not forced: REFRESH_HANDLER=legacy php artisan test runs the suite against the old handler. -->
         <env name="REFRESH_HANDLER" value="v2"/>
         <env name="DB_URL" value=""/>

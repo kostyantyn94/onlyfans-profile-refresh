@@ -11,7 +11,7 @@ class FetchProfile extends Command
 {
     protected $signature = 'profiles:fetch
         {username : OnlyFans username, e.g. madison420ivy}
-        {--account=fansapi : Account slug whose key is used}
+        {--account=onlyfans : Account slug: onlyfans (signed requests to onlyfans.com) or fansapi}
         {--queue : Hand the refresh to Horizon instead of running it in this process}';
 
     protected $description = 'Track a profile and refresh it from the upstream';

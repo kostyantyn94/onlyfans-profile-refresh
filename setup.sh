@@ -24,5 +24,5 @@ docker compose exec app php artisan migrate --seed --force
 
 echo
 echo "Ready: http://localhost:8000 (profiles) and http://localhost:8000/horizon"
-echo "Put your Fans API key in .env (FANSAPI_KEY=...), then:"
+echo "Fetch the profile straight from onlyfans.com (signed requests, guest session, no key needed):"
 echo "  docker compose exec app php artisan profiles:fetch madison420ivy"

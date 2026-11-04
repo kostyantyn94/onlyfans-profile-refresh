@@ -6,6 +6,7 @@ use App\Jobs\LegacyRefreshProfile;
 use App\Jobs\RefreshProfile;
 use App\Models\Profile;
 use App\Refresh\RefreshScheduler;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
@@ -100,6 +101,9 @@ class RefreshSchedulingTest extends TestCase
 
     public function test_the_fetch_command_tracks_and_refreshes_a_profile(): void
     {
+        // Shortly after the fixture was cached by Fans API (08:12:09 UTC), so
+        // the cached answer is recent enough to be a refresh.
+        $this->travelTo(CarbonImmutable::parse('2026-11-01 08:30:00 UTC'));
         $this->seed();
         config(['refresh.handler' => 'v2']);
         Http::fake(['*' => Http::response($this->fixture('fansapi-madison420ivy.json'))]);

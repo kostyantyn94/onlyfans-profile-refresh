@@ -35,7 +35,16 @@ return [
         // 4 tries, 5 s base: a refresh rides out about half a minute of 5xx.
         'server_error' => ['max' => 4, 'base_seconds' => (float) env('REFRESH_RETRY_BASE', 5), 'cap_seconds' => 60],
         'timeout' => ['max' => 4, 'base_seconds' => (float) env('REFRESH_RETRY_BASE', 5), 'cap_seconds' => 60],
+        // Even ?fresh=true returned an old snapshot: the upstream's own session is
+        // in trouble, so wait longer before asking again.
+        'cache_still_too_old' => ['max' => 3, 'base_seconds' => 30, 'cap_seconds' => 300],
+        // A rejected signature is retried soon with reloaded rules and a new session.
+        'signature_rejected' => ['max' => 3, 'base_seconds' => (float) env('REFRESH_RETRY_BASE', 5), 'cap_seconds' => 60],
+        // No usable rules: give the rule sources time to catch up with OnlyFans.
+        'rules_unavailable' => ['max' => 3, 'base_seconds' => 60, 'cap_seconds' => 600],
     ],
+    // Every outbound request counts, follow-ups included, and the budget is
+    // checked before each one is sent.
     'max_upstream_attempts' => 10,
 
     // How many refresh jobs of one account may call the upstream at the same
