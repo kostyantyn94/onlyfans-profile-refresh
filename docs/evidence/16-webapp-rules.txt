@@ -1,0 +1,37 @@
+# Signing rules read from OnlyFans' web app code, live.
+# Commit: dd80622 Docs and evidence for the final code   Run: 2026-11-04T03:34Z
+
+$ php artisan onlyfans:rules --reload     # reads the page, app.js and the signing script
++---------------------+---------------------------------------------------------------------------------------------------------+
+| Field               | Value                                                                                                   |
++---------------------+---------------------------------------------------------------------------------------------------------+
+| upstream            | https://onlyfans.com                                                                                    |
+| source              | webapp:https://onlyfans.com/                                                                            |
+| web app release     | 202611031453-fbc506331f                                                                                 |
+| rules (fingerprint) | 54d826cfd48b                                                                                            |
+| sign                | 67634:<sha1>:<checksum, hex>:6ae9f59b                                                                   |
+| static param        | LVIMTEyGaoXC1Vp1q6i0QuwGciDSyaWw                                                                        |
+| checksum            | sha1 characters at 0,0,1,1,1,1,2,2,3,3,4,4,5,8,8,9,9,10,11,12,12,13,17,17,18,20,21,33,34,34,35,37 -1634 |
+| app-token           | 33d57ade8c02dbc5a333db99ff9ae26a                                                                        |
+| headers left out    | -                                                                                                       |
++---------------------+---------------------------------------------------------------------------------------------------------+
+
+$ php artisan onlyfans:rules --reload     # same release: only the page is read again
+| source              | webapp:https://onlyfans.com/                                                                            |
+| web app release     | 202611031453-fbc506331f                                                                                 |
+| rules (fingerprint) | 54d826cfd48b                                                                                            |
+
+# storage/logs/refresh.log during this run:
+{"message":"onlyfans.webapp_rules_read","context":{"release":"202611031453-fbc506331f","signing_script":"2313.js","signing_module":"802313","ms":597},"level":200,"level_name":"INFO","channel":"local","datetime":"2026-11-04T03:34:32.592066+00:00","extra":{}}
+{"message":"onlyfans.rules_loaded","context":{"host":"onlyfans.com","rules_source":"webapp:https://onlyfans.com/","rules":"54d826cfd48b","release":"202611031453-fbc506331f","passed_over":[]},"level":200,"level_name":"INFO","channel":"local","datetime":"2026-11-04T03:34:32.594946+00:00","extra":{}}
+{"message":"onlyfans.rules_loaded","context":{"host":"onlyfans.com","rules_source":"webapp:https://onlyfans.com/","rules":"54d826cfd48b","release":"202611031453-fbc506331f","passed_over":[]},"level":200,"level_name":"INFO","channel":"local","datetime":"2026-11-04T03:34:34.108953+00:00","extra":{}}
+
+# The public rule feeds right now (not used by default; opt-in via ONLYFANS_RULES_SOURCES), for comparison:
+https://raw.githubusercontent.com/rafa-9/dynamic-rules/main/rules.json
+"static_param":"UQe4c0nznfr5xt8EANtG9HyHmvMdqNRX" "prefix":"64937" "suffix":"6aa15875" "checksum_constant":728 
+https://raw.githubusercontent.com/DATAHOARDERS/dynamic-rules/main/onlyfans.json
+"static_param":"278ensloiFsow2rJMopwDWaMUiysP5fU" "format":"65232:{}:{:x}:6aa95d0a" "checksum_constant":-1085 
+https://raw.githubusercontent.com/datawhores/onlyfans-dynamic-rules/main/dynamicRules.json
+"static_param":"lZ9AAqh17MwkYNtMFJruP9IHybSQP8TG" "prefix":"26974" "suffix":"669fb034" "checksum_constant":-302 
+https://raw.githubusercontent.com/riley-access-labs/onlyfans-dynamic-rules-1/main/dynamicRules.json
+"end":"6814ac82" "start":"40811" "format":"40811:{}:{:x}:6814ac82" "prefix":"40811" "suffix":"6814ac82" "revision":"202505021128-1f7c650f64" "static_param":"blIBOW6AfpUVeYgBRJ7XOCdWackgOHZd" "checksum_constant":-167 

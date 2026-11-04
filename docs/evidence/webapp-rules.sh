@@ -29,14 +29,14 @@ done
   echo '# storage/logs/refresh.log during this run:'
   tail -c +$((LOG_OFFSET + 1)) storage/logs/refresh.log | grep -E 'onlyfans\.(rules_|webapp_)' | cut -c1-400
   echo
-  echo '# The public rule feeds right now (the fallback sources), for comparison:'
+  echo '# The public rule feeds right now (not used by default; opt-in via ONLYFANS_RULES_SOURCES), for comparison:'
   for url in \
     https://raw.githubusercontent.com/rafa-9/dynamic-rules/main/rules.json \
     https://raw.githubusercontent.com/DATAHOARDERS/dynamic-rules/main/onlyfans.json \
     https://raw.githubusercontent.com/datawhores/onlyfans-dynamic-rules/main/dynamicRules.json \
     https://raw.githubusercontent.com/riley-access-labs/onlyfans-dynamic-rules-1/main/dynamicRules.json; do
     echo "$url"
-    curl -fsS --max-time 10 "$url" | tr -d '\n ' | grep -oE '"(static_param|prefix|start|suffix|end|format|checksum_constant|revision)":"?[^",}]*"?' | tr '\n' ' '
+    curl -fsS --max-time 10 "$url" | tr -d '\n ' | grep -oE '"(static_param|prefix|start|suffix|end|format|checksum_constant|revision)":("[^"]*"|[^,}"]*)' | tr '\n' ' '
     echo
   done
 } > "$OUT" 2>&1
