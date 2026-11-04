@@ -55,7 +55,7 @@ refresh is pending. Only tested on Windows 11 with Docker Desktop.
 |---|---|
 | `docker compose exec app php artisan profiles:fetch madison420ivy [--queue]` | fetch from onlyfans.com now in this process, or hand it to Horizon |
 | `docker compose exec app php artisan profiles:fetch madison420ivy --account=fansapi` | the same through Fans API (needs `FANSAPI_KEY` in `.env`) |
-| `docker compose exec app php artisan test` | 129 tests (Postgres and Redis of their own, never a real upstream) |
+| `docker compose exec app php artisan test` | 144 tests (Postgres and Redis of their own, never a real upstream) |
 | `docker compose exec -e REFRESH_HANDLER=legacy app php artisan test --group=incident` | the incident tests against the **old** handler: 6 of 7 fail |
 | `docker compose exec app php artisan workload:run --handler=legacy` / `--handler=v2` | the workload, before / after |
 | `docker compose exec app php artisan workload:run --rotate-rules=4` | the same, with the signing rules changing 4 s in |
@@ -88,6 +88,13 @@ app makes for a profile page. A public profile needs no login: a guest session i
 | `x-bc` | a random 40-hex token per session, as the web app keeps in local storage |
 | `Cookie`, `User-Agent` | the session's cookies (`sess`, `__cf_bm`, ...) and the user agent they belong to |
 
+What live guest requests showed on 4 Nov ([15](docs/evidence/15-live-probes.txt), before the client
+was written): the first signed request works without any cookies, and OnlyFans sets `sess`,
+`__cf_bm` and `_cfuvid` on it, so there is no separate session bootstrap; without `x-bc` the answer
+is HTTP 400 "Something went wrong"; `user-id` is optional for a guest; an unknown username is HTTP
+404 "User not found" (`not_found`); a wrong signature is HTTP 400 with error code 401. Responses
+carry `x-of-rev`, the web app's release, which is logged with every rejected signature.
+
 **Signing rules change with OnlyFans releases**, so they are loaded at run time and never
 hard-coded ([`SigningRulesProvider`](app/Upstream/OnlyFans/SigningRulesProvider.php)):
 
@@ -95,24 +102,32 @@ hard-coded ([`SigningRulesProvider`](app/Upstream/OnlyFans/SigningRulesProvider.
   JSON file to pin rules by hand). Feeds publish three different shapes; all are read, and the values
   are validated strictly (types, index range 0–39, hex app token), since they come from third
   parties. They are data only: nothing from a feed is executed.
-- The rules are cached per host for 60 min and shared by all workers; one worker loads them while
-  the others wait for its result.
+- The rules are cached per host and shared by all workers. After 60 min one worker reloads them
+  while the others keep signing with the last good copy; if the sources fail, that copy stays in
+  use. A load that finds nothing usable is remembered for 30 s, so jobs fail fast instead of all
+  asking the sources again, and no job waits more than 2 s for another worker's load.
 - OnlyFans answers a signature it does not accept with HTTP 400 and
   `{"error":{"code":401,"message":"Please refresh the page"}}`. That is `signature_rejected`: the
-  cached rules and the session are dropped, and the refresh retries soon. A rejection can be the
-  session's fault, so rules are only skipped after they have been rejected twice, each time with a
-  new session; then the next source's rules are used. If no source has usable rules, nothing is
-  sent (`rules_unavailable`, retried later, within the budget).
+  cached rules and the guest session are dropped, and the refresh retries soon. A rejection can be
+  the session's fault, so what is counted is the *sessions* rejected with a set of rules (a Redis set
+  of hashed `x-bc` tokens): two requests in flight on one bad session count once, and a logged-in
+  account whose login OnlyFans distrusts cannot condemn rules on its own. Rules rejected for two
+  different sessions within 30 min are skipped and the next source's rules are used. If no source
+  has usable rules, nothing is sent (`rules_unavailable`, retried later, within the budget).
 - On 4 Nov one of the four feeds had current rules and two were outdated (their requests got the
-  answer above); the evidence of a rotation handled mid-run is [13](docs/evidence/13-workload-rules-rotation.txt).
+  answer above; [15](docs/evidence/15-live-probes.txt)). A rotation handled mid-run:
+  [13](docs/evidence/13-workload-rules-rotation.txt).
 
 **Sessions** ([`SessionStore`](app/Upstream/OnlyFans/SessionStore.php)): one per account, in the
 cache (encrypted: cookies are credentials), shared by all workers. A guest session is created on
 first use; every response's `Set-Cookie` headers are applied in order (OnlyFans deletes and re-sets
-`sess` in one response, without a `Domain`). After a rejection or a 401/403 the session is dropped
-and the next request starts a new one. An account can instead hold a logged-in browser session in
-its encrypted credential (`{"user_id", "cookie", "x_bc", "user_agent"}`): then its user id is sent
-and signed, and cookies OnlyFans rotates are kept on top of it.
+`sess` in one response, without a `Domain`), to the session as it is stored at that moment, under a
+short per-account lock: concurrent responses do not undo each other's cookies, and a late response
+cannot bring back a session that was dropped meanwhile. After a rejection or a 401/403 a guest
+session is dropped and the next request starts a new one. An account can instead hold a logged-in
+browser session in its encrypted credential (`{"user_id", "cookie", "x_bc", "user_agent"}`): then its
+user id is sent and signed, the session follows the cookies OnlyFans sets from then on, and it is
+replaced when the credential changes or removed with it.
 
 **Likes are `favoritedCount`.** OnlyFans returns no revision, so the time the request was sent (ms)
 is the revision: of two answers for one profile, the one requested later carries the newer data.
@@ -242,8 +257,9 @@ HTTP timeout 10 s (connect 3 s)  <  job timeout 30 s  <  Redis retry_after 90 s
   starts a job the first one is still running.
 - **The job timeout** is enforced by the worker: past 30 s the worker process is killed, the run
   counts towards `$maxExceptions` (3), and Redis hands the job out again only after `retry_after`.
-  The HTTP timeout keeps one slow upstream call well inside it; loading signing rules has its own
-  4 s per source.
+  The HTTP timeout keeps one slow upstream call well inside it. Signing rules add at most a 2 s wait
+  for another worker's load, or a load of their own at 3 s per source: with all four feeds hanging,
+  2 + 12 + 10 s = 24 s, still inside the 30 s.
 
 **Two workers on the same long-running attempt:** (1) the nesting above, so redelivery only
 happens once the first worker is gone; (2) `WithoutOverlapping` per profile, with a lock that
@@ -432,7 +448,10 @@ it (or clear the cached `onlyfans:rules:onlyfans.com` entry for an immediate swi
 - **Rate limits are discovered, not paced**, and the gate re-queues waiting jobs instead of holding
   them per account; fine for this workload, churn at tens of thousands. No account-level circuit
   breaker for 5xx or 401/403 yet; each profile backs off on its own.
-- **A worker killed between the upstream call and the commit leaves the call unrecorded.**
+- **A worker killed between the upstream call and the commit leaves the call unrecorded**, and so
+  does an unexpected exception there (bookkeeping after the response, such as saving cookies, is
+  caught and logged so it cannot cause one). Such calls are outside the 10-attempt budget, bounded
+  by `$maxExceptions` (3).
 - **Concurrency is tested sequentially** (two deliveries one after the other); the guarantees rest on
   single conditional statements and the per-profile lock.
 - `refresh_attempts` has no retention; deferral log lines are noisy at debug level.
@@ -471,6 +490,6 @@ app/Jobs/           RefreshProfile (fixed), LegacyRefreshProfile (incident),
 app/Console/        profiles:fetch|enqueue-due|repair, workload:run|check|crash|throughput|scheduler-memory
 fake-upstream/      stand-in for OnlyFans' api2 (checks signatures, can rotate its rules) and Fans API
 resources/fixtures/ upstream response fixtures, incl. real madison420ivy responses, made-up signing rules
-tests/              129 PHPUnit tests
+tests/              144 PHPUnit tests
 docs/               scaling.md; evidence/ (tests, workload, crash, throughput, memory, clean setup, live fetches)
 ```

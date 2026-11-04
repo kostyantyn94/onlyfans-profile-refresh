@@ -309,6 +309,21 @@ class RefreshJobTest extends TestCase
         $this->assertNotNull($profile->pending_refresh_id, 'the refresh keeps its claim');
     }
 
+    public function test_a_fresh_answer_marked_live_but_taken_long_ago_is_not_stored(): void
+    {
+        // The age comes from cached_at alone; is_cached=false does not make an old snapshot new.
+        $this->travelTo(CarbonImmutable::parse('2026-11-01 20:00:00 UTC'));
+        $profile = $this->profileWithValidData($this->makeFansApiAccount());
+        $old = json_decode($this->fixture('fansapi-madison420ivy.json'), true);
+        $old['_meta']['_cache']['is_cached'] = false;
+        Http::fake(['*' => Http::response($old)]);
+
+        $this->runRefresh($profile);
+
+        $this->assertSame(['cache_too_old', 'cache_still_too_old'], RefreshAttempt::query()->orderBy('id')->pluck('outcome')->all());
+        $this->assertSame(120_000, $profile->refresh()->likes_count);
+    }
+
     public function test_no_live_request_is_sent_when_it_would_exceed_the_attempt_budget(): void
     {
         // Review finding: the ?fresh=true follow-up could be an 11th call.

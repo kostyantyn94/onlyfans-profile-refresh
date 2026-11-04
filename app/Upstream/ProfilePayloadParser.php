@@ -110,13 +110,13 @@ class ProfilePayloadParser
         // Fans API has no revision. The time Fans API took the snapshot from
         // OnlyFans grows with every new snapshot, so it orders responses the
         // same way; without it, fall back to when we sent the request.
-        $cache = $json['_meta']['_cache'] ?? null;
-        $cachedAtMs = $this->cachedAt($cache);
+        $cachedAtMs = $this->cachedAt($json['_meta']['_cache'] ?? null);
         $revision = $cachedAtMs ?? $fallbackRevision;
-        $fromCache = is_array($cache) && ($cache['is_cached'] ?? false) === true && $cachedAtMs !== null;
 
+        // The snapshot's age is judged by cached_at alone, whatever is_cached
+        // says: an answer marked live but taken hours ago is still old.
         return new ProfileSnapshot($likes, $revision, 'fansapi', $this->attributes($data), $data,
-            $fromCache ? CarbonImmutable::createFromTimestampMs($cachedAtMs) : null);
+            $cachedAtMs !== null ? CarbonImmutable::createFromTimestampMs($cachedAtMs) : null);
     }
 
     private function fromRevisioned(array $json): ProfileSnapshot

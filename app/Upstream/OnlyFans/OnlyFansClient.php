@@ -6,6 +6,8 @@ use App\Models\Account;
 use App\Upstream\ProfileClient;
 use App\Upstream\UpstreamResponse;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * GET {base_url}/api2/v2/users/{username}: the request OnlyFans' own web app
@@ -59,18 +61,19 @@ class OnlyFansClient implements ProfileClient
 
         $durationMs = (int) ((hrtime(true) - $started) / 1_000_000);
 
-        $this->sessions->update($account, $session, $response->toPsrResponse()->getHeader('Set-Cookie'));
-
         $rejected = $this->signatureRejected($response->status(), $response->body());
 
+        $this->afterResponse(fn () => $this->sessions->update($account, $session, $response->toPsrResponse()->getHeader('Set-Cookie')));
+
         if ($rejected) {
-            $this->rules->reject($account->base_url, $rules);
+            $this->afterResponse(fn () => $this->rules->reject($account->base_url, $rules, $session->xBc, $response->header('x-of-rev') ?: null));
         }
 
-        if ($rejected || in_array($response->status(), [401, 403], true)) {
-            // Start the next request from a new session: the rejection may be
-            // the session's, not the rules'.
-            $this->sessions->forget($account);
+        if (($rejected || in_array($response->status(), [401, 403], true)) && $session->isGuest()) {
+            // Start the next request from a new guest session: the rejection may
+            // be the session's, not the rules'. A logged-in session is the
+            // account's own and stays; its credential decides.
+            $this->afterResponse(fn () => $this->sessions->forget($account));
         }
 
         return new UpstreamResponse(
@@ -81,6 +84,20 @@ class OnlyFansClient implements ProfileClient
             durationMs: $durationMs,
             signatureRejected: $rejected,
         );
+    }
+
+    /**
+     * Session and rules bookkeeping after a response. It must not lose the
+     * response (the request was made and will be recorded as an attempt), so a
+     * failure here, e.g. Redis unavailable or the session lock busy, is logged.
+     */
+    private function afterResponse(callable $step): void
+    {
+        try {
+            $step();
+        } catch (Throwable $e) {
+            Log::channel('refresh')->warning('onlyfans.bookkeeping_failed', ['error' => class_basename($e).': '.mb_strimwidth($e->getMessage(), 0, 200)]);
+        }
     }
 
     /**

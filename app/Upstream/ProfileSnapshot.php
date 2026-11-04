@@ -17,7 +17,7 @@ final readonly class ProfileSnapshot
         public string $format,
         public array $attributes,
         public array $raw,
-        // Set when Fans API answered from its cache: when that snapshot was taken.
+        // Fans API only: when the snapshot was taken (its _meta._cache.cached_at).
         public ?CarbonImmutable $cachedAt = null,
     ) {}
 }

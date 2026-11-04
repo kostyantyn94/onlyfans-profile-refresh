@@ -53,6 +53,39 @@ class OnlyFansClientTest extends TestCase
         });
     }
 
+    public function test_the_real_onlyfans_response_stores_the_full_profile(): void
+    {
+        $profile = $this->profileWithValidData(attributes: ['likes_count' => null, 'revision' => null, 'name' => null]);
+        Http::fake(['upstream.test/api2/v2/users/*' => Http::response($this->fixture('onlyfans-madison420ivy.json'))]);
+
+        $this->runRefresh($profile);
+
+        $profile->refresh();
+        $this->assertSame(612_018, $profile->likes_count);
+        $this->assertSame('Madison Ivy', $profile->name);
+        $this->assertSame(5_140_520, $profile->upstream_id);
+        $this->assertSame([178, 623, 202], [$profile->posts_count, $profile->photos_count, $profile->videos_count]);
+        $this->assertCount(85, $profile->raw, 'the whole user object is kept');
+        // No revision from OnlyFans: the request time (ms) is the revision.
+        $this->assertEqualsWithDelta(now()->getTimestampMs(), $profile->revision, 60_000);
+        $this->assertEqualsWithDelta(now()->addHours(24)->timestamp, $profile->next_refresh_at->timestamp, 5, 'above 100,000 likes: every 24 h');
+    }
+
+    public function test_an_unknown_user_is_not_found_and_not_retried(): void
+    {
+        $profile = $this->profileWithValidData();
+        // What OnlyFans answered for an unknown username (15-live-probes.txt).
+        Http::fake(['*' => Http::response(['error' => ['code' => 0, 'message' => 'User not found']], 404)]);
+
+        $job = $this->runRefresh($profile);
+
+        $profile->refresh();
+        $this->assertSame('not_found', $profile->last_attempt_status);
+        $this->assertFalse($job->job->isReleased());
+        $this->assertNull($profile->pending_refresh_id);
+        $this->assertSame(120_000, $profile->likes_count);
+    }
+
     public function test_the_guest_session_keeps_its_x_bc_and_the_cookies_onlyfans_sets(): void
     {
         $account = $this->makeAccount();
@@ -169,7 +202,7 @@ class OnlyFansClientTest extends TestCase
     {
         $profile = $this->profileWithValidData();
         Http::fake(['*' => Http::sequence()
-            ->push(self::REJECTED, 400, ['Set-Cookie' => 'sess=s3cr3t-guest-1; path=/'])
+            ->push(self::REJECTED, 400, ['Set-Cookie' => 'sess=s3cr3t-guest-1; path=/', 'x-of-rev' => '202611040930-1a2b3c4d5e'])
             ->push($this->user(), 200, ['Set-Cookie' => 'sess=s3cr3t-guest-2; path=/'])]);
         $refreshId = (string) Str::uuid();
 
@@ -182,13 +215,15 @@ class OnlyFansClientTest extends TestCase
         $prefix = (string) config('database.redis.options.prefix');
         $stored = implode("\n", array_map(fn ($key) => (string) $cache->get(Str::after($key, $prefix)), $cache->keys('*')));
         $this->assertStringContainsString('onlyfans:session:', implode(' ', $cache->keys('*')), 'the session is in the cache');
+        $this->assertStringContainsString('eyJpdiI', $stored, 'read back: an encrypted payload ({"iv":...})');
 
         foreach (['s3cr3t-guest', ...$xBcs] as $secret) {
             $this->assertStringNotContainsString($secret, $log);
             $this->assertStringNotContainsString($secret, $stored);
         }
         $this->assertStringNotContainsString('static_param', $log);
-        $this->assertStringContainsString('onlyfans.signature_rejected', $log);
+        $rejection = collect($this->refreshLogLines())->firstWhere('message', 'onlyfans.signature_rejected');
+        $this->assertSame('202611040930-1a2b3c4d5e', $rejection['context']['onlyfans_rev'], 'the web app release OnlyFans reported');
     }
 
     public function test_an_onlyfans_user_object_without_likes_is_invalid(): void

@@ -59,8 +59,9 @@ Outside our control, the hard ceiling is OnlyFans' own throttling per session an
 not published and which I have not measured (a handful of live requests). Whatever it is, 579/s
 means many sessions, and per-account pacing matters more than the number of workers. Signing itself
 costs one SHA-1 per request and the rules are loaded once per host per hour plus after rejections,
-so it does not grow with traffic; a rules rotation costs every request in flight one
-`signature_rejected` retry until the new rules are loaded. (With the Fans API driver the ceiling
+so it does not grow with traffic; while the feeds are down a failed load is remembered for 30 s and
+the last good rules stay in use, so an outage does not multiply fetches either. A rules rotation
+costs every request in flight one `signature_rejected` retry until the new rules are loaded. (With the Fans API driver the ceiling
 was the per-team limit: 1 refresh/s on our 60-requests/min key, 83/s at 5,000/min.)
 
 **Evidence to collect:** scheduler lag (age of the oldest due but unclaimed profile) and loop

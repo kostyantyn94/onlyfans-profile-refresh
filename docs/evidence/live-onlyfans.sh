@@ -15,6 +15,9 @@ sql() { docker compose exec -T postgres psql -U app -d profiles -c "$1"; }
 
 OUT=docs/evidence/14-live-onlyfans-fetch.txt
 LOG_OFFSET=$(wc -c < storage/logs/refresh.log 2>/dev/null || echo 0)
+# The new profile is due at once; keep the scheduler from claiming it before the fetch below.
+docker compose stop scheduler >/dev/null 2>&1
+trap 'docker compose start scheduler >/dev/null 2>&1' EXIT
 {
   echo "# Live: signed guest requests to onlyfans.com/api2/v2/users/madison420ivy."
   echo "# Commit: $(git log -1 --format='%h %s')   Run: $(date -u +%Y-%m-%dT%H:%MZ)"

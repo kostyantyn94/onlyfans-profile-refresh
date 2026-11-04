@@ -1,0 +1,31 @@
+# Live probes against onlyfans.com, 4 Nov 2026, run by hand (see AI.md), before the client was written.
+# Guest requests to GET /api2/v2/users/madison420ivy, signed by a separate Python implementation.
+
+# 1) Which public rule feed is current: one signed guest request per feed.
+#    (The DATAHOARDERS feed was not read: the probe split its "format" string wrongly; see AI.md.)
+cookies after bootstrap: ['__cf_bm', '_cfuvid', 'sess']
+datahoarders: feed error too many values to unpack (expected 4)
+datawhores: HTTP 400: {"error": {"code": 401, "message": "Please refresh the page"}}
+riley: HTTP 400: {"error": {"code": 401, "message": "Please refresh the page"}}
+rafa9: HTTP 200 OK: username=madison420ivy favoritedCount=612018 postsCount=178 fields=85
+
+# 2) What a guest request needs, with the rafa-9 rules (probe-onlyfans.py).
+$ python -I probe-onlyfans.py
+1 no cookies at all: HTTP 200 | username=madison420ivy favoritedCount=612018 fields=85 | sets cookies: ['__cf_bm', '_cfuvid', 'sess']
+   response header names: ['access-control-allow-credentials', 'access-control-allow-headers', 'access-control-allow-methods', 'access-control-expose-headers', 'allow', 'alt-svc', 'cache-control', 'cf-cache-status', 'cf-ray', 'connection', 'content-type', 'cross-origin-opener-policy', 'date', 'expires', 'pragma', 'referrer-policy', 'server', 'strict-transport-security', 'transfer-encoding', 'vary', 'x-content-type-options', 'x-frame-options', 'x-of-rev']
+   cookies now: ['__cf_bm', '_cfuvid', 'sess']
+2 same session again: HTTP 200 | username=madison420ivy favoritedCount=612018 fields=85 | sets cookies: []
+3 no x-bc header: HTTP 400 | {"error": {"code": 0, "message": "Something went wrong. [BB91C8D6]"}} | sets cookies: ['__cf_bm', '_cfuvid', 'sess']
+4 no user-id header: HTTP 200 | username=madison420ivy favoritedCount=612018 fields=85 | sets cookies: ['__cf_bm', '_cfuvid', 'sess']
+5 unknown username: HTTP 404 | {"error": {"code": 0, "message": "User not found"}} | sets cookies: []
+6 wrong signing rules: HTTP 400 | {"error": {"code": 401, "message": "Please refresh the page"}} | sets cookies: []
+
+# What the client takes from this:
+# - no session bootstrap request: the first signed request works without cookies, and OnlyFans
+#   sets sess, __cf_bm and _cfuvid on it; the client keeps and sends them from then on;
+# - x-bc is required (always sent); user-id is optional for a guest (sent as "0", as the web app does);
+# - 400 with error code 401 means the signature was refused (signature_rejected, retried with reloaded
+#   rules and a new session); 400 with code 0 is any other bad request (client_error, not retried);
+# - 404 "User not found" is not_found (not retried);
+# - the 85-field user object is what Fans API returns under "data", minus its two own fields
+#   (ofapi_gender, ofapi_gender_confidence).

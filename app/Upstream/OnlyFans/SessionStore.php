@@ -16,8 +16,9 @@ use Throwable;
  *    on the first responses. Enough for public profiles. Dropped after a
  *    rejection, so the next request starts a new one.
  *  - Logged in: the account's credential holds what a browser session sends
- *    (user id, cookie header, x-bc, user agent). Cookies OnlyFans rotates later
- *    are kept on top, until the credential itself changes.
+ *    (user id, cookie header, x-bc, user agent). The session starts from it and
+ *    then follows the cookies OnlyFans sets, until the credential changes or is
+ *    removed.
  */
 class SessionStore
 {
@@ -29,16 +30,29 @@ class SessionStore
         if ($credential !== null) {
             $basis = hash('sha256', json_encode($credential));
 
-            return new Session(
+            if ($stored?->basis === $basis) {
+                return $stored;
+            }
+
+            $session = new Session(
                 (string) $credential['user_id'],
                 (string) $credential['x_bc'],
                 (string) ($credential['user_agent'] ?? config('services.onlyfans.user_agent')),
-                [...Session::parseCookieHeader((string) $credential['cookie']), ...($stored?->basis === $basis ? $stored->cookies : [])],
+                Session::parseCookieHeader((string) $credential['cookie']),
                 $basis,
             );
+            Cache::put($this->key($account), $this->encode($session), $this->ttl());
+
+            return $session;
         }
 
-        if ($stored?->isGuest()) {
+        if ($stored !== null && ! $stored->isGuest()) {
+            // The account's login was removed: its session goes with it.
+            $this->forget($account);
+            $stored = null;
+        }
+
+        if ($stored !== null) {
             return $stored;
         }
 
@@ -48,12 +62,29 @@ class SessionStore
         return $this->load($account) ?? Session::guest((string) config('services.onlyfans.user_agent'));
     }
 
-    /** @param  list<string>  $setCookieHeaders */
-    public function update(Account $account, Session $session, array $setCookieHeaders): void
+    /**
+     * Apply a response's Set-Cookie headers to the session as it is stored now,
+     * under a short per-account lock: concurrent responses do not undo each
+     * other's cookies, and a session dropped meanwhile (after a rejection) is not
+     * brought back by a late response that was sent with it.
+     *
+     * @param  list<string>  $setCookieHeaders
+     */
+    public function update(Account $account, Session $sentWith, array $setCookieHeaders): void
     {
-        if ($setCookieHeaders !== []) {
-            Cache::put($this->key($account), $this->encode($session->withSetCookies($setCookieHeaders)), $this->ttl());
+        if ($setCookieHeaders === []) {
+            return;
         }
+
+        Cache::lock('onlyfans:session-lock:'.$account->id, 5)->block(1, function () use ($account, $sentWith, $setCookieHeaders) {
+            $current = $this->load($account);
+
+            if ($current === null || $current->xBc !== $sentWith->xBc || $current->basis !== $sentWith->basis) {
+                return;
+            }
+
+            Cache::put($this->key($account), $this->encode($current->withSetCookies($setCookieHeaders)), $this->ttl());
+        });
     }
 
     public function forget(Account $account): void

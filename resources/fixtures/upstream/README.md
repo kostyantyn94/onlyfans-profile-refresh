@@ -4,7 +4,7 @@ Used by the tests (`tests/`). The local fake upstream (`fake-upstream/server.php
 
 | File | What it is | Status |
 |---|---|---|
-| `onlyfans-madison420ivy.json` | Real OnlyFans `GET /api2/v2/users/madison420ivy` response (signed, guest session), captured 2026-11-04. Likes are `favoritedCount`. | 200 |
+| `onlyfans-madison420ivy.json` | Real OnlyFans `GET /api2/v2/users/madison420ivy` response (signed, guest session), captured 2026-11-04 by `docs/evidence/probe-onlyfans.py`. Likes are `favoritedCount`. The same 85 fields as Fans API's `data`, without its two `ofapi_*` fields. | 200 |
 | `onlyfans-test-rules.json` | Made-up signing rules for the test host `upstream.test` (`prefix`/`suffix`/`app-token` shape). Not OnlyFans' rules. | – |
 | `onlyfans-test-rules-rotated.json` | A second made-up set (`format`/`app_token`/`remove_headers` shape), for the rotation test. | – |
 | `fansapi-madison420ivy.json` | Real Fans API `GET /api/profiles/madison420ivy` response, captured 2026-11-01 (cache hit, 0 credits). Likes are `data.favoritedCount`. | 200 |

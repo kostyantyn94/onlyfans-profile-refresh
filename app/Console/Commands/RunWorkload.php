@@ -150,7 +150,7 @@ class RunWorkload extends Command
         $redis = Redis::connection();
         $redis->del('queues:refresh', 'queues:refresh:delayed', 'queues:refresh:reserved', 'queues:refresh:notify');
 
-        foreach (['refresh:cooldown:*', 'refresh:funnel:*'] as $pattern) {
+        foreach (['refresh:cooldown:*', 'refresh:funnel:*', 'onlyfans:rules-rejected:*'] as $pattern) {
             foreach ($redis->keys($pattern) as $key) {
                 $redis->del(Str::after($key, $prefix));
             }

@@ -6,9 +6,10 @@
   and browser access. It read the task and the Fans API docs, proposed the plan and the data
   source, wrote the code, tests, workload and these documents, ran everything and recorded the
   evidence. Commits carry a `Co-Authored-By` line for that reason.
-- Two more Claude Code agents did **independent reviews** of the finished code, one after the
-  other, with no access to how it was written (prompt: find correctness bugs, unsupported claims,
-  missing requirements, vacuous tests). Their findings and what was done with them are below.
+- Further Claude Code agents did **independent reviews** of the finished code, with no access to
+  how it was written (prompt: find correctness bugs, unsupported claims, missing requirements,
+  vacuous tests): two for the first submission, one after your review. Their findings and what was
+  done with them are below.
 - A further agent redesigned the UI in a separate git worktree (Blade and plain CSS, no build step);
   I merged and checked it.
 - My part: setting the constraints (time box, English-only deliverables, no keys in git, ask
@@ -130,7 +131,8 @@ these notes; I set the direction and ran the live checks.
   check refused to let the agent send signed requests to onlyfans.com. So the agent wrote two small
   probe scripts (which rule feed is current, which headers and cookies a guest request needs, what
   a bad signature and an unknown user get), I ran them and pasted the output back, and the client
-  was built from that. The full live check through the job is
+  was built from that ([15](docs/evidence/15-live-probes.txt),
+  [`probe-onlyfans.py`](docs/evidence/probe-onlyfans.py)). The full live check through the job is
   [14](docs/evidence/14-live-onlyfans-fetch.txt), also run by me.
 - **Each of your three findings has a regression test that fails on the reviewed code**, recorded
   with the fix stashed: [12](docs/evidence/12-review-fixes-tests.txt).
@@ -155,6 +157,28 @@ Mistakes caught in this round:
 - **`php artisan migrate --env=testing` ran against the local database**, because there is no
   `.env.testing`. Harmless here (it was the new migration, which sets every existing account to the
   Fans API driver), but the tests migrate their own database and that command was not needed.
+
+A third independent review (same setup as the first two, of this round's code) found, all confirmed
+and fixed, each with a new test:
+
+- **One bad session could switch off the current rules for every account.** Rejections were counted
+  per response: two requests in flight on one distrusted session, or a logged-in account whose
+  login was no longer trusted, were enough to skip valid rules for 30 min. Now the *sessions* are
+  counted (a Redis set of hashed `x-bc` tokens), so it takes two different sessions.
+- **Rules loading could hold workers and hammer the feeds** while no rules were usable: no memory of
+  a failed load, a 10 s lock wait, 4 s per feed, together past the 30 s job timeout. Now a failed
+  load is remembered for 30 s, stale rules keep being used while one worker reloads (and when the
+  feeds fail), the lock wait is 2 s and a feed gets 3 s.
+- **Concurrent responses could overwrite the session**, or bring back one that had just been
+  dropped after a rejection. Updates now apply to the stored session under a per-account lock, and
+  only if it is still the session the request was sent with.
+- **Removing a login credential was not honoured** (the stored logged-in session stayed), and a
+  logged-in session lost its rotated cookies on a rejected signature. Both fixed.
+- **The stale check trusted `is_cached`**: a `?fresh=true` answer marked live but taken hours ago
+  would have been stored. The age now comes from `cached_at` alone.
+- Not changed: the old handler now fails its job when no signing rules are usable (the incident
+  handler had no such case; the incident tests are unaffected), and calls made right before a crash
+  stay unrecorded (listed in the README's limits).
 
 ## Not verified
 

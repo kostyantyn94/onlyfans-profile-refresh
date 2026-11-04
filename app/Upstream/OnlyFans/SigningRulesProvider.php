@@ -6,47 +6,58 @@ use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Redis;
 use Throwable;
 
 /**
  * The current signing rules per upstream host, shared by every worker through
  * the cache. Sources (services.onlyfans.rules_sources) are tried in order; the
- * first with valid rules that OnlyFans has not kept rejecting is used.
+ * first with valid rules that OnlyFans is not rejecting is used.
  *
- * A rejected signature does not prove the rules are outdated: the guest session
- * can be the cause. So reject() only drops the cached copy (the source may have
- * published newer rules) while the client drops the session; rules rejected
- * rules_reject_limit times within rules_skip_minutes, each time with a new
- * session, are skipped in favour of the next source.
+ *  - Rules older than rules_ttl_minutes are reloaded by one worker while the
+ *    others keep signing with the last good copy.
+ *  - A load that finds no usable rules is remembered for 30 s, so jobs fail
+ *    fast instead of all asking the sources again.
+ *  - A rejected signature does not prove the rules are outdated: the session can
+ *    be the cause. reject() drops the cached copy (the source may have newer
+ *    rules) and counts the *sessions* that got rejected with these rules; only
+ *    when rules_reject_limit different sessions were rejected within
+ *    rules_skip_minutes are the rules skipped for the next source.
  */
 class SigningRulesProvider
 {
+    // Seconds a job waits for another worker that is loading the rules.
+    private const LOCK_WAIT = 2;
+
+    // Seconds a failed load is remembered.
+    private const UNAVAILABLE_FOR = 30;
+
     /** @throws SigningRulesUnavailable */
     public function for(string $baseUrl): SigningRules
     {
         $host = $this->host($baseUrl);
+        $cached = $this->cached($host);
 
-        if ($rules = $this->cached($host)) {
-            return $rules;
+        if ($cached !== null && ! $cached['stale']) {
+            return $cached['rules'];
+        }
+
+        $failure = Cache::get($this->unavailableKey($host));
+
+        if ($cached !== null) {
+            // Past their TTL: one worker reloads, the others keep using them meanwhile.
+            return $failure === null
+                ? (Cache::lock($this->lockKey($host), 20)->get(fn () => $this->reload($host, $cached['rules'])) ?: $cached['rules'])
+                : $cached['rules'];
+        }
+
+        if ($failure !== null) {
+            throw new SigningRulesUnavailable($failure);
         }
 
         try {
-            // One worker loads; the others wait for its result instead of all
-            // fetching the sources at once.
-            return Cache::lock('onlyfans:rules:load:'.$host, 20)->block(10, function () use ($host) {
-                if ($rules = $this->cached($host)) {
-                    return $rules;
-                }
-
-                $rules = $this->load($host);
-                Cache::put($this->cacheKey($host), [
-                    'rules' => $rules->toArray(),
-                    'source' => $rules->source,
-                    'fingerprint' => $rules->fingerprint(),
-                ], now()->addMinutes((int) config('services.onlyfans.rules_ttl_minutes')));
-
-                return $rules;
-            });
+            return Cache::lock($this->lockKey($host), 20)->block(self::LOCK_WAIT,
+                fn () => $this->cached($host)['rules'] ?? $this->reload($host, null));
         } catch (LockTimeoutException) {
             throw new SigningRulesUnavailable("signing rules for {$host} are still being loaded by another worker");
         }
@@ -54,15 +65,20 @@ class SigningRulesProvider
 
     /**
      * OnlyFans refused a request signed with these rules. Forget the cached copy
-     * and count the rejection; at the limit the rules are skipped for a while.
+     * and remember which session was refused; once enough different sessions
+     * were, the rules are skipped for a while.
+     *
+     * @param  string  $sessionToken  the session's x-bc, stored only as a hash
+     * @param  ?string  $webAppRevision  OnlyFans' x-of-rev header: a new value marks a release
      */
-    public function reject(string $baseUrl, SigningRules $rules): void
+    public function reject(string $baseUrl, SigningRules $rules, string $sessionToken, ?string $webAppRevision = null): void
     {
         $host = $this->host($baseUrl);
         $key = $this->rejectionsKey($host, $rules);
 
-        Cache::add($key, 0, now()->addMinutes((int) config('services.onlyfans.rules_skip_minutes')));
-        $rejections = (int) Cache::increment($key);
+        Redis::sadd($key, hash('sha256', $sessionToken));
+        Redis::expire($key, (int) config('services.onlyfans.rules_skip_minutes') * 60);
+        $sessions = (int) Redis::scard($key);
 
         // Another worker may have loaded newer rules meanwhile; keep those.
         if ((Cache::get($this->cacheKey($host))['fingerprint'] ?? null) === $rules->fingerprint()) {
@@ -73,20 +89,54 @@ class SigningRulesProvider
             'host' => $host,
             'rules_source' => $rules->source,
             'rules' => substr($rules->fingerprint(), 0, 12),
-            'rejections' => $rejections,
-            'skipped' => $rejections >= (int) config('services.onlyfans.rules_reject_limit'),
+            'sessions_rejected' => $sessions,
+            'skipped' => $sessions >= (int) config('services.onlyfans.rules_reject_limit'),
+            'onlyfans_rev' => $webAppRevision,
         ]);
     }
 
-    private function cached(string $host): ?SigningRules
+    /** @return array{rules: SigningRules, stale: bool}|null */
+    private function cached(string $host): ?array
     {
         $cached = Cache::get($this->cacheKey($host));
 
         try {
-            return is_array($cached) ? SigningRules::fromArray($cached['rules'], (string) $cached['source']) : null;
+            return is_array($cached) ? [
+                'rules' => SigningRules::fromArray($cached['rules'], (string) $cached['source']),
+                'stale' => (int) $cached['loaded_at'] < now()->subMinutes((int) config('services.onlyfans.rules_ttl_minutes'))->timestamp,
+            ] : null;
         } catch (InvalidSigningRules) {
             return null;
         }
+    }
+
+    /** Load from the sources; if none has usable rules, keep the last good ones when there are any. */
+    private function reload(string $host, ?SigningRules $lastGood): SigningRules
+    {
+        try {
+            $rules = $this->load($host);
+        } catch (SigningRulesUnavailable $e) {
+            Cache::put($this->unavailableKey($host), $e->getMessage(), now()->addSeconds(self::UNAVAILABLE_FOR));
+
+            if ($lastGood === null) {
+                throw $e;
+            }
+
+            Log::channel('refresh')->warning('onlyfans.rules_reload_failed', ['host' => $host, 'kept' => substr($lastGood->fingerprint(), 0, 12)]);
+
+            return $lastGood;
+        }
+
+        // Kept a day, but reloaded after rules_ttl_minutes (see cached()).
+        Cache::put($this->cacheKey($host), [
+            'rules' => $rules->toArray(),
+            'source' => $rules->source,
+            'fingerprint' => $rules->fingerprint(),
+            'loaded_at' => now()->timestamp,
+        ], now()->addDay());
+        Cache::forget($this->unavailableKey($host));
+
+        return $rules;
     }
 
     private function load(string $host): SigningRules
@@ -104,7 +154,7 @@ class SigningRulesProvider
             }
 
             if ($this->isSkipped($host, $rules)) {
-                $problems[] = $source.': rejected by OnlyFans '.config('services.onlyfans.rules_reject_limit').' times recently';
+                $problems[] = $source.': rejected by OnlyFans for '.config('services.onlyfans.rules_reject_limit').' sessions recently';
 
                 continue;
             }
@@ -128,7 +178,8 @@ class SigningRulesProvider
     private function read(string $source): array
     {
         if (preg_match('#^https?://#i', $source) === 1) {
-            $response = Http::acceptJson()->connectTimeout(3)->timeout(4)->get($source);
+            // Short: four slow sources must still fit in a job (see README, "Timeouts").
+            $response = Http::acceptJson()->connectTimeout(2)->timeout(3)->get($source);
 
             if (! $response->successful()) {
                 throw new InvalidSigningRules("HTTP {$response->status()}");
@@ -151,7 +202,7 @@ class SigningRulesProvider
 
     private function isSkipped(string $host, SigningRules $rules): bool
     {
-        return (int) Cache::get($this->rejectionsKey($host, $rules), 0) >= (int) config('services.onlyfans.rules_reject_limit');
+        return (int) Redis::scard($this->rejectionsKey($host, $rules)) >= (int) config('services.onlyfans.rules_reject_limit');
     }
 
     private function host(string $baseUrl): string
@@ -164,6 +215,17 @@ class SigningRulesProvider
         return 'onlyfans:rules:'.$host;
     }
 
+    private function unavailableKey(string $host): string
+    {
+        return 'onlyfans:rules-unavailable:'.$host;
+    }
+
+    private function lockKey(string $host): string
+    {
+        return 'onlyfans:rules-load:'.$host;
+    }
+
+    // In Redis directly (a set of hashed session tokens); the rest is in the cache.
     private function rejectionsKey(string $host, SigningRules $rules): string
     {
         return 'onlyfans:rules-rejected:'.$host.':'.$rules->fingerprint();
