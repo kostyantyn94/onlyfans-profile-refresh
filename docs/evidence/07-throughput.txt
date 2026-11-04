@@ -1,5 +1,5 @@
-# Commit 47cb4da (Reload rules once per rejection burst; crash check waits for a result), recorded 2026-11-04T03:30Z
-Queued 3000 refreshes in 3.74 s (scheduler memory grew by 0.0 MB). Processing...
+# Commit 3665d45 (Docs after the fifth review; clean-setup check re-run at the final code), recorded 2026-11-04T03:59Z
+Queued 3000 refreshes in 4.58 s (scheduler memory grew by 0.0 MB). Processing...
 +-------------------------------+-----------------------------------------+
 | metric                        | value                                   |
 +-------------------------------+-----------------------------------------+
@@ -7,10 +7,10 @@ Queued 3000 refreshes in 3.74 s (scheduler memory grew by 0.0 MB). Processing...
 | unfinished at the end         | 0                                       |
 | Horizon refresh workers       | 4                                       |
 | upstream latency added        | 50 ms                                   |
-| scheduler: claim + dispatch   | 3.74 s for 3000 (801/s), memory +0.0 MB |
-| wall time until all refreshed | 62.4 s                                  |
-| throughput                    | 48 refreshes/s (12.0 per worker)        |
-| upstream call p50 / p95       | 57 / 110 ms                             |
+| scheduler: claim + dispatch   | 4.58 s for 3000 (655/s), memory +0.0 MB |
+| wall time until all refreshed | 63.2 s                                  |
+| throughput                    | 47 refreshes/s (11.9 per worker)        |
+| upstream call p50 / p95       | 57 / 108 ms                             |
 | worker peak memory (max seen) | 36.5 MB                                 |
 | upstream requests             | 3000                                    |
 +-------------------------------+-----------------------------------------+

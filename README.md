@@ -66,10 +66,10 @@ of the first finding; see [AI.md](AI.md).
 | | Old handler | Fixed handler |
 |---|---|---|
 | Refreshes the workers reported as successful | 50 of 50 | 50 of 50 |
-| Refreshes with **correct stored data** | 23 of 50 (27 have likes = 0) | **50 of 50** |
-| Busy account: upstream requests per correct refresh | 4.0 | 1.33 |
-| Busy account: all its refreshes finished after | 17.0 s, more than half of them wrong | 27.0 s: it now waits out the rate limit |
-| Calm account: oldest waiting refresh | 15.5 s (stuck behind the busy account) | 1.1 s |
+| Refreshes with **correct stored data** | 26 of 50 (24 have likes = 0) | **50 of 50** |
+| Busy account: upstream requests per correct refresh | 3.38 | 1.38 |
+| Busy account: all its refreshes finished after | 17.0 s, half of them wrong | 26.6 s: it now waits out the rate limit |
+| Calm account: oldest waiting refresh | 16.3 s (stuck behind the busy account) | 1.9 s |
 
 After the old handler's run, `profiles:repair` and the fixed handler brought all 50 profiles back
 to correct data ([03b](docs/evidence/03b-repair-after-legacy.txt)).
@@ -294,14 +294,14 @@ Results, both runs from one `run-all.sh` pass ([03](docs/evidence/03-workload-be
 | | Old: busy | Old: calm | Fixed: busy | Fixed: calm |
 |---|---|---|---|---|
 | Reported successful | 40 | 10 | 40 | 10 |
-| **Stored data correct** (121,000 / rev 11) | **18** | **5** | **40** | **10** |
-| Stored data wrong (likes 0) | 22 | 5 | 0 | 0 |
-| Upstream requests (counted by the fake upstream) | 72 | 10 | 53 | 10 |
-| **Requests per correct refresh** | **4.0** | **2.0** | **1.33** | **1.0** |
-| Upstream answers | 34×200, 34×429, 4×500 | 10×200 | 40×200, 9×429, 4×500 | 10×200 |
-| **Oldest waiting refresh (max)** | 16.8 s | **15.5 s** | 26.8 s | **1.1 s** |
-| All finished after | 17.0 s | 15.7 s | 27.0 s | 1.4 s |
-| Session tokens or keys in logs | 0 | 0 | 0 | 0 |
+| **Stored data correct** (121,000 / rev 11) | **21** | **5** | **40** | **10** |
+| Stored data wrong (likes 0) | 19 | 5 | 0 | 0 |
+| Upstream requests (counted by the fake upstream) | 71 | 10 | 55 | 10 |
+| **Requests per correct refresh** | **3.38** | **2.0** | **1.38** | **1.0** |
+| Upstream answers | 35×200, 34×429, 2×500 | 10×200 | 40×200, 10×429, 5×500 | 10×200 |
+| **Oldest waiting refresh (max)** | 17.5 s | **16.3 s** | 27.1 s | **1.9 s** |
+| All finished after | 17.0 s | 15.7 s | 26.6 s | 1.5 s |
+| Session tokens or keys in logs (every one the fake upstream saw) | 0 | 0 | 0 | 0 |
 
 - **Old:** everything "succeeds" and about half the data is wrong. The calm account cannot start
   until the busy burst has slept through its retries.
@@ -320,7 +320,7 @@ the same 40 + 10 workload, with the fake upstream switching to new signing rules
 does with a release. One request was rejected ("Please refresh the page"). The rejection marked the
 cached rules for reloading and renewed the session; 10 ms later the new rules were loaded
 (fingerprint `aa2a8f26…` → `ea4fdcf9…`) and every worker used them from then on. Result: 50 of 50
-correct, 54 + 10 requests, the calm account's oldest wait 2.5 s, 0 failed jobs. (The rules had been
+correct, 49 + 10 requests, the calm account's oldest wait 1.6 s, 0 failed jobs. (The rules had been
 accepted seconds before, so the rejection was not counted against them; the reload found new ones.)
 
 ## Worker crash
@@ -372,17 +372,17 @@ refresh of the rules rotation run ([13](docs/evidence/13-workload-rules-rotation
 lines, abridged; the attempt lines also carry `account`, `username`, `job_id`):
 
 ```text
-$ grep 98d6e46d-508c-4832-a912-a9be665419e4 storage/logs/refresh.log   (+ the onlyfans.* lines)
-03:27:06.84 refresh.queued
-03:27:07.77 onlyfans.rules_loaded        rules=aa2a8f263e64 rules_source=http://fake-upstream:8080/rules.json
-03:27:07.84 refresh.retry_scheduled      job_attempt=1 upstream_attempt=1 outcome=rate_limited http_status=429 retry_in_seconds=2
-03:27:09.62 refresh.deferred             reason=account_cooldown delay_seconds=2
-03:27:11.81 refresh.deferred             reason=account_cooldown delay_seconds=1
-03:27:12.84 onlyfans.signature_rejected  rules=aa2a8f263e64 rules_proven=true sessions_rejected=0 skipped=false
-03:27:12.85 refresh.retry_scheduled      job_attempt=4 upstream_attempt=2 outcome=signature_rejected http_status=400 retry_in_seconds=3
-03:27:12.86 onlyfans.rules_loaded        rules=ea4fdcf9fa3d
-03:27:16.03 refresh.deferred             reason=account_cooldown delay_seconds=4
-03:27:21.13 refresh.success              job_attempt=6 upstream_attempt=3 http_status=200 revision=11 likes=121000
+$ grep 98c44981-aa75-4e5f-83ec-ae5ffe0ea586 storage/logs/refresh.log   (+ the onlyfans.* lines)
+03:56:01.02 refresh.queued
+03:56:01.20 onlyfans.rules_loaded        rules=aa2a8f263e64 rules_source=http://fake-upstream:8080/rules.json
+03:56:01.27 refresh.deferred             reason=account_cooldown delay_seconds=2
+03:56:03.82 refresh.retry_scheduled      job_attempt=2 upstream_attempt=1 outcome=rate_limited http_status=429 retry_in_seconds=2
+03:56:05.93 refresh.deferred             reason=account_cooldown delay_seconds=2
+03:56:07.95 onlyfans.signature_rejected  rules=aa2a8f263e64 rules_proven=true sessions_rejected=0 skipped=false
+03:56:07.95 refresh.retry_scheduled      job_attempt=4 upstream_attempt=2 outcome=signature_rejected http_status=400 retry_in_seconds=4
+03:56:07.96 onlyfans.rules_loaded        rules=ea4fdcf9fa3d
+03:56:11.50 refresh.deferred             reason=account_cooldown delay_seconds=2
+03:56:14.19 refresh.success              job_attempt=6 upstream_attempt=3 http_status=200 revision=11 likes=121000
 ```
 
 Six job runs, three upstream attempts: deferrals spend none.
@@ -404,9 +404,9 @@ profiles ([09](docs/evidence/09-scheduler-memory.txt)). Bodies over 1 MB are ref
 
 ## The next scaling limit
 
-Full write-up: [docs/scaling.md](docs/scaling.md). Measured on one machine: **48 refreshes/s with
+Full write-up: [docs/scaling.md](docs/scaling.md). Measured on one machine: **47 refreshes/s with
 4 workers** through the signed client (upstream call p50 57 ms), and the scheduler queues
-**800–950/s** per process ([07](docs/evidence/07-throughput.txt),
+**650–970/s** per process ([07](docs/evidence/07-throughput.txt),
 [09](docs/evidence/09-scheduler-memory.txt)). 50 M jobs a day is 579/s on average.
 
 - **First limit: OnlyFans' capacity per identity.** Every request goes out as some session from some

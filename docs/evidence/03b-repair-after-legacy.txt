@@ -1,6 +1,6 @@
-# Commit 47cb4da (Reload rules once per rejection burst; crash check waits for a result), recorded 2026-11-04T03:26Z
-$ php artisan profiles:repair --since="2026-11-04 03:25:55"
-50 profile(s) marked successful since 2026-11-04 03:25:55 UTC.
+# Commit 3665d45 (Docs after the fifth review; clean-setup check re-run at the final code), recorded 2026-11-04T03:55Z
+$ php artisan profiles:repair --since="2026-11-04 03:54:48"
+50 profile(s) marked successful since 2026-11-04 03:54:48 UTC.
 Revision cleared and refresh queued for 50 profile(s); 0 already had a refresh pending.
 
 $ php artisan workload:check

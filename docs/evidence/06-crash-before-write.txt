@@ -1,5 +1,5 @@
-# Commit 47cb4da (Reload rules once per rejection burst; crash check waits for a result), recorded 2026-11-04T03:29Z
-Refresh cc2b2423-fa5f-4823-b6d3-638ee59b4b4d queued; the worker that picks it up will be killed before-write.
+# Commit 3665d45 (Docs after the fifth review; clean-setup check re-run at the final code), recorded 2026-11-04T03:57Z
+Refresh 45ef7faf-e76e-44bc-a89d-0992b9d52d49 queued; the worker that picks it up will be killed before-write.
 Worker killed after 1.0 s. Profile now: likes=120000 revision=10, claim still held, attempts recorded: 1, jobs reserved in Redis: 1.
 Waiting for Redis to hand the job out again (retry_after = 90 s)...
 +------------------------------------------+------------------------------+
