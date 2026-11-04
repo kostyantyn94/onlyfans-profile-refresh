@@ -56,6 +56,11 @@ class SessionStore
             return $stored;
         }
 
+        if (Cache::has($this->key($account))) {
+            // Stored but unreadable (e.g. APP_KEY rotated): it would block the new one below.
+            $this->forget($account);
+        }
+
         // First writer wins, so concurrent workers end up sharing one session.
         Cache::add($this->key($account), $this->encode(Session::guest((string) config('services.onlyfans.user_agent'))), $this->ttl());
 
@@ -87,9 +92,26 @@ class SessionStore
         });
     }
 
-    public function forget(Account $account): void
+    /**
+     * Drop the account's session. With $sentWith, only if it is still that
+     * session: a late rejection of an old session must not drop the new one
+     * another worker has started meanwhile.
+     */
+    public function forget(Account $account, ?Session $sentWith = null): void
     {
-        Cache::forget($this->key($account));
+        if ($sentWith === null) {
+            Cache::forget($this->key($account));
+
+            return;
+        }
+
+        Cache::lock('onlyfans:session-lock:'.$account->id, 5)->block(1, function () use ($account, $sentWith) {
+            $current = $this->load($account);
+
+            if ($current !== null && $current->xBc === $sentWith->xBc && $current->basis === $sentWith->basis) {
+                Cache::forget($this->key($account));
+            }
+        });
     }
 
     private function load(Account $account): ?Session

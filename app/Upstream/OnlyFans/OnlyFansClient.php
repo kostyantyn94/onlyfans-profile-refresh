@@ -30,9 +30,10 @@ class OnlyFansClient implements ProfileClient
         $session = $this->sessions->for($account);
 
         $url = rtrim($account->base_url, '/').'/api2/v2/users/'.rawurlencode($username);
-        // The signature covers the path as sent, including any prefix in the
-        // base URL (the fake upstream tells accounts apart by one).
-        $path = (string) parse_url($url, PHP_URL_PATH);
+        // The signature covers the path and query as sent, including any prefix
+        // in the base URL (the fake upstream tells accounts apart by one).
+        $query = parse_url($url, PHP_URL_QUERY);
+        $path = (string) parse_url($url, PHP_URL_PATH).(is_string($query) ? '?'.$query : '');
         $sentAtMs = (int) floor(microtime(true) * 1000);
 
         $headers = [
@@ -53,7 +54,7 @@ class OnlyFansClient implements ProfileClient
             $headers['x-of-rev'] = $rules->release;
         }
 
-        if ($session->cookies !== []) {
+        if ($session->liveCookies() !== []) {
             $headers['Cookie'] = $session->cookieHeader();
         }
 
@@ -70,16 +71,20 @@ class OnlyFansClient implements ProfileClient
         $rejected = $this->signatureRejected($response->status(), $response->body());
 
         $this->afterResponse(fn () => $this->sessions->update($account, $session, $response->toPsrResponse()->getHeader('Set-Cookie')));
+        $revision = $response->header('x-of-rev') ?: null;
 
         if ($rejected) {
-            $this->afterResponse(fn () => $this->rules->reject($account->base_url, $rules, $session->xBc, $response->header('x-of-rev') ?: null));
+            $this->afterResponse(fn () => $this->rules->reject($account->base_url, $rules, $session->xBc, $revision));
+        } elseif ($response->successful() || $response->status() === 404) {
+            // The signature passed: "User not found" is an answer too.
+            $this->afterResponse(fn () => $this->rules->accepted($account->base_url, $rules, $revision));
         }
 
         if (($rejected || in_array($response->status(), [401, 403], true)) && $session->isGuest()) {
             // Start the next request from a new guest session: the rejection may
             // be the session's, not the rules'. A logged-in session is the
             // account's own and stays; its credential decides.
-            $this->afterResponse(fn () => $this->sessions->forget($account));
+            $this->afterResponse(fn () => $this->sessions->forget($account, $session));
         }
 
         return new UpstreamResponse(

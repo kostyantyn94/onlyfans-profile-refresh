@@ -128,8 +128,28 @@ final class SyntheticWebApp
         return '(self.webpackChunkof_vue=self.webpackChunkof_vue||[]).push([[7777],{807777:function(W,n,o){'
             .'var t=o(1),c=o.n(t),r=o(2),d=o.n(r),e=o(3),u=o.n(e),f=o(4);'
             .'function k(){const W=['.implode(',', $shipped).'];return(k=function(){return W})()}'
-            .'function i(W,n){W-='.self::OFFSET.';const o=k();let t=o[W];return t}'
+            .self::decoder()
             .$rotate.','.$signing.'}}]);';
+    }
+
+    /**
+     * i(index, key): the string at index - OFFSET, decoded as the obfuscator does it
+     * (its base64 alphabet, the bytes as UTF-8, then RC4 with the key). A working
+     * decoder, so the chunk really computes its signature when run
+     * (synthetic-web-app-in-node.mjs checks that).
+     */
+    private static function decoder(): string
+    {
+        return 'function i(W,n){W-='.self::OFFSET.';const o=k();let t=o[W];'
+            .'const a="'.self::ALPHABET.'";let r="",p="";'
+            .'for(let c=0,e,f,g=0;f=t.charAt(g++);~f&&(e=c%4?64*e+f:f,c++%4)?r+=String.fromCharCode(255&e>>(-2*c&6)):0)f=a.indexOf(f);'
+            .'for(let h=0;h<r.length;h++)p+="%"+("00"+r.charCodeAt(h).toString(16)).slice(-2);'
+            .'t=decodeURIComponent(p);const s=[];let j=0,x,u="";'
+            .'for(let q=0;q<256;q++)s[q]=q;'
+            .'for(let q=0;q<256;q++){j=(j+s[q]+n.charCodeAt(q%n.length))%256;x=s[q];s[q]=s[j];s[j]=x}'
+            .'for(let q=0,y=0,z=0;y<t.length;y++){q=(q+1)%256;z=(z+s[q])%256;x=s[q];s[q]=s[z];s[z]=x;'
+            .'u+=String.fromCharCode(t.charCodeAt(y)^s[(s[q]+s[z])%256])}'
+            .'return u}';
     }
 
     /** A call of wrapper $function that resolves to the string: its index is shifted by $shift on the way to i(). */

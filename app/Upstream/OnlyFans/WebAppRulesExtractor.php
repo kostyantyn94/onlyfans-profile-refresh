@@ -23,6 +23,12 @@ class WebAppRulesExtractor
 {
     private const ALPHABET = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+/=';
 
+    // The signing module is ~9 KB with a few hundred strings; far more is not that
+    // module, and rotating a huge array would not fit in a job's time.
+    private const MAX_MODULE_BYTES = 300_000;
+
+    private const MAX_STRINGS = 5_000;
+
     /** @var list<string> the string array, rotated into place */
     private array $strings = [];
 
@@ -45,6 +51,10 @@ class WebAppRulesExtractor
      */
     public function extract(string $chunk, string $appToken, string $source = '', ?string $release = null): SigningRules
     {
+        if (strlen($chunk) > self::MAX_MODULE_BYTES) {
+            throw new InvalidSigningRules('signing module unexpectedly large');
+        }
+
         $this->strings = $this->stringArray($chunk);
         [$this->decoder, $this->offset] = $this->decoderFunction($chunk);
         $this->rotate($chunk);
@@ -96,6 +106,10 @@ class WebAppRulesExtractor
         }
 
         preg_match_all('/"((?:[^"\\\\]|\\\\.)*)"/', $m[1], $all);
+
+        if (count($all[1]) > self::MAX_STRINGS) {
+            throw new InvalidSigningRules('string array unexpectedly large');
+        }
 
         return array_map(fn ($s) => $this->unescape($s), $all[1]);
     }
@@ -210,17 +224,18 @@ class WebAppRulesExtractor
             [$state[$i], $state[$j]] = [$state[$j], $state[$i]];
         }
 
-        $out = '';
+        $out = [];
         $i = $j = 0;
 
         foreach ($units as $unit) {
             $i = ($i + 1) % 256;
             $j = ($j + $state[$i]) % 256;
             [$state[$i], $state[$j]] = [$state[$j], $state[$i]];
-            $out .= mb_chr($unit ^ $state[($state[$i] + $state[$j]) % 256], 'UTF-8');
+            $out[] = $unit ^ $state[($state[$i] + $state[$j]) % 256];
         }
 
-        return $out;
+        // UTF-16 code units, as JavaScript strings are: surrogate pairs stay pairs.
+        return mb_convert_encoding(pack('n*', ...$out), 'UTF-8', 'UTF-16BE');
     }
 
     /**
@@ -233,7 +248,9 @@ class WebAppRulesExtractor
         $ops = [];
         $call = '(\w+)\((-?\d+),"((?:[^"\\\\]|\\\\.)*)"\)';
 
-        preg_match_all('/(\w+):(?:function\((\w+),(\w+)(?:,\w+)*\)\{return ([^}]*)\}|'.$call.')/', $source, $all, PREG_SET_ORDER);
+        // Each entry must end at a comma or the end of the object: a value that goes on
+        // (o(1,"a")+o(2,"b"), o(1,"a").split("")...) is left out, and whatever uses it fails.
+        preg_match_all('/(?:^|,)(\w+):(?:function\((\w+),(\w+)(?:,\w+)*\)\{return ([^}]*)\}|'.$call.')(?=,|$)/', $source, $all, PREG_SET_ORDER);
 
         foreach ($all as $m) {
             if (($m[5] ?? '') !== '') {
@@ -304,10 +321,21 @@ class WebAppRulesExtractor
         return preg_match('/^\s*([+-]?\d+)/', $value, $m) ? (float) $m[1] : NAN;
     }
 
-    /** A JavaScript double-quoted string's content, unescaped. */
     private function unescape(string $literal): string
     {
-        $json = preg_replace_callback('/\\\\x([0-9a-fA-F]{2})/', fn ($m) => '\\u00'.$m[1], $literal);
+        return self::jsString($literal);
+    }
+
+    /**
+     * A JavaScript double-quoted string's content, unescaped. Escapes are read in one
+     * pass, so an escaped backslash followed by "x41" stays that, not "A".
+     *
+     * @throws InvalidSigningRules
+     */
+    public static function jsString(string $literal): string
+    {
+        $json = preg_replace_callback('/\\\\(?:x([0-9a-fA-F]{2})|(.))/s',
+            fn ($m) => ($m[1] ?? '') !== '' ? '\\u00'.$m[1] : '\\'.$m[2], $literal);
 
         return json_decode('"'.$json.'"') ?? throw new InvalidSigningRules('unreadable string literal');
     }

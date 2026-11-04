@@ -9,7 +9,7 @@ use Illuminate\Console\Command;
 class ShowSigningRules extends Command
 {
     protected $signature = 'onlyfans:rules
-        {--reload : Forget the rules in use and load them from the sources again}
+        {--reload : Load the rules from the sources now and use them from the next request on}
         {--base-url= : Upstream to show the rules for (default: services.onlyfans.base_url)}';
 
     protected $description = 'Show the signing rules OnlyFans requests are signed with, and where they came from';
@@ -18,12 +18,9 @@ class ShowSigningRules extends Command
     {
         $baseUrl = (string) ($this->option('base-url') ?: config('services.onlyfans.base_url'));
 
-        if ($this->option('reload')) {
-            $provider->forget($baseUrl);
-        }
-
         try {
-            $rules = $provider->for($baseUrl);
+            // --reload: from the sources now; workers keep signing with the cached copy meanwhile.
+            $rules = $this->option('reload') ? $provider->reloadNow($baseUrl) : $provider->for($baseUrl);
         } catch (SigningRulesUnavailable $e) {
             $this->error($e->getMessage());
 

@@ -25,7 +25,7 @@ final class ProfileView
         return match (true) {
             $case === null => 'bad',
             $case->isSuccess() => 'good',
-            $case->isRetryable(), $case === Outcome::Stale, $case === Outcome::CacheTooOld => 'warn',
+            $case->isRetryable(), $case === Outcome::Stale, $case === Outcome::CacheTooOld, $case === Outcome::InFlight => 'warn',
             default => 'bad',
         };
     }
@@ -50,6 +50,7 @@ final class ProfileView
             'auth_failed' => 'HTTP 401 or 403: the session or API key was refused',
             'client_error' => 'Another HTTP 4xx: failed at once, data kept',
             'gave_up' => 'Retries ran out or the job kept failing',
+            'in_flight' => 'Sent, no answer recorded: still running, or the worker died before recording it (counted as an attempt)',
             default => 'Unknown outcome',
         };
     }

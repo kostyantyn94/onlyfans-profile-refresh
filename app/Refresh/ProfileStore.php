@@ -50,13 +50,15 @@ class ProfileStore
                 // the next refresh out a little (never earlier than planned), or
                 // an upstream stuck on an old revision would be asked every minute.
                 $outcome = Outcome::Stale;
-                $retry = $now->addMinutes((int) config('refresh.failed_retry_after_minutes'))->toDateTimeString();
+                $retry = $now->addMinutes((int) config('refresh.failed_retry_after_minutes'));
                 Profile::query()->whereKey($profile->id)->update([
                     'last_attempt_at' => $now,
                     'last_attempt_status' => $outcome->value,
-                    'next_refresh_at' => DB::raw("GREATEST(COALESCE(next_refresh_at, '{$retry}'), '{$retry}')"),
                     'updated_at' => $now,
                 ]);
+                Profile::query()->whereKey($profile->id)
+                    ->where(fn ($q) => $q->whereNull('next_refresh_at')->orWhere('next_refresh_at', '<', $retry))
+                    ->update(['next_refresh_at' => $retry]);
             }
 
             $this->releaseClaim($profile->id, $refreshId);
@@ -68,12 +70,13 @@ class ProfileStore
     /**
      * A failed attempt. The last valid data and last_success_at stay as they are.
      * A final failure also counts as one more failed refresh, gives the claim
-     * back and schedules a later retry.
+     * back and schedules a later retry. Only the refresh that holds the claim
+     * writes: an old job giving up must not mark a newer refresh as failed.
      */
     public function recordFailure(Profile $profile, Outcome $outcome, string $reason, string $refreshId, bool $final, CarbonImmutable $now): void
     {
         DB::transaction(function () use ($profile, $outcome, $reason, $refreshId, $final, $now) {
-            Profile::query()->whereKey($profile->id)->update([
+            Profile::query()->whereKey($profile->id)->where('pending_refresh_id', $refreshId)->update([
                 'last_attempt_at' => $now,
                 'last_attempt_status' => $outcome->value,
                 'last_failure_at' => $now,

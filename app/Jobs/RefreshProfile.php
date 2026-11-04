@@ -38,6 +38,10 @@ class RefreshProfile implements ShouldQueue
     // upstream failures, which are handled and never thrown.
     public int $maxExceptions = 3;
 
+    // Seconds before a job that threw runs again: a database failover of a
+    // minute does not use up $maxExceptions in milliseconds.
+    public array $backoff = [10, 60];
+
     public function __construct(
         public int $profileId,
         public int $accountId,

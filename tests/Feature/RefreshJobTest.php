@@ -9,6 +9,7 @@ use App\Refresh\RefreshScheduler;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Queue\MaxAttemptsExceededException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -379,7 +380,9 @@ class RefreshJobTest extends TestCase
         $profile = $this->profileWithValidData();
         $refreshId = (string) Str::uuid();
         Http::fake(['*' => $status === 200 ? Http::response($this->fixture('new-format.json')) : Http::response('', 500)]);
-        RefreshAttempt::creating(fn () => throw new RuntimeException('database went away'));
+        // The attempt row is written before the call; recording its result, inside
+        // the transaction with the profile write, is what fails here.
+        RefreshAttempt::updating(fn () => throw new RuntimeException('database went away'));
 
         try {
             $this->runRefresh($profile, $refreshId);
@@ -389,11 +392,16 @@ class RefreshJobTest extends TestCase
         }
 
         $profile->refresh();
-        $this->assertSame([120_000, 10], [$profile->likes_count, $profile->revision], 'nothing written without its attempt row');
+        $this->assertSame([120_000, 10], [$profile->likes_count, $profile->revision], 'nothing written without its attempt result');
         $this->assertSame('success', $profile->last_attempt_status);
         $this->assertNull($profile->last_failure_at);
-        $this->assertSame($refreshId, $profile->pending_refresh_id, 'the claim stays, so the redelivery redoes the attempt');
-        $this->assertSame(0, RefreshAttempt::query()->count());
+        $this->assertSame($refreshId, $profile->pending_refresh_id, 'the claim stays for the redelivery');
+        $this->assertSame(['in_flight'], RefreshAttempt::query()->pluck('outcome')->all(), 'the call was made, so it is counted');
+
+        // The redelivery counts the unanswered call and makes the next attempt.
+        RefreshAttempt::flushEventListeners();
+        $this->runRefresh($profile, $refreshId);
+        $this->assertSame(['in_flight', $status === 200 ? 'success' : 'server_error'], RefreshAttempt::query()->orderBy('id')->pluck('outcome')->all());
     }
 
     public function test_the_same_revision_with_different_likes_corrects_the_stored_row(): void
@@ -496,6 +504,62 @@ class RefreshJobTest extends TestCase
         $this->assertSame('gave_up', $profile->last_attempt_status);
         $this->assertNull($profile->refresh_queued_at);
         $this->assertSame(120_000, $profile->likes_count);
+    }
+
+    public function test_retry_after_on_a_503_is_honoured(): void
+    {
+        $profile = $this->profileWithValidData();
+        Http::fake(['*' => Http::response('', 503, ['Retry-After' => '9'])]);
+
+        $this->runRefresh($profile)->assertReleased(9);
+    }
+
+    public function test_a_cached_fans_api_answer_without_a_date_is_not_taken_as_fresh(): void
+    {
+        $this->travelTo(CarbonImmutable::parse('2026-11-01 08:30:00 UTC'));
+        $profile = $this->profileWithValidData($this->makeFansApiAccount());
+        $undated = json_decode($this->fixture('fansapi-madison420ivy.json'), true);
+        $undated['_meta']['_cache'] = ['is_cached' => true, 'cached_at' => ''];
+        Http::fake(['*' => Http::response($undated)]);
+
+        $this->runRefresh($profile);
+
+        $this->assertSame(['cache_too_old', 'cache_still_too_old'], RefreshAttempt::query()->orderBy('id')->pluck('outcome')->all(),
+            'of unknown age: asked again live, and not stored');
+        $this->assertSame(120_000, $profile->refresh()->likes_count);
+    }
+
+    public function test_an_old_job_giving_up_does_not_mark_a_newer_refresh_as_failed(): void
+    {
+        $profile = $this->profileWithValidData();
+        $new = (string) Str::uuid();
+        Profile::query()->whereKey($profile->id)->update(['refresh_queued_at' => now(), 'pending_refresh_id' => $new]);
+
+        // A job of an older refresh, whose claim was taken over, fails for good.
+        app(RefreshScheduler::class)->makeJob($profile->id, $profile->account_id, (string) Str::uuid())
+            ->failed(new RuntimeException('worker died'));
+
+        $profile->refresh();
+        $this->assertSame('success', $profile->last_attempt_status);
+        $this->assertNull($profile->last_failure_at);
+        $this->assertSame($new, $profile->pending_refresh_id);
+    }
+
+    public function test_waiting_for_another_workers_rules_load_spends_no_attempt(): void
+    {
+        $profile = $this->profileWithValidData();
+        Http::fake();
+        // Another worker is loading the signing rules and nothing is cached yet.
+        $lock = Cache::lock('onlyfans:rules-load:upstream.test', 20);
+        $lock->get();
+
+        $job = $this->runRefresh($profile);
+        $lock->release();
+
+        $job->assertReleased(3);
+        Http::assertNothingSent();
+        $this->assertSame(0, RefreshAttempt::query()->count());
+        $this->assertNotNull($profile->refresh()->pending_refresh_id);
     }
 
     public function test_logs_follow_a_refresh_and_never_contain_the_key(): void

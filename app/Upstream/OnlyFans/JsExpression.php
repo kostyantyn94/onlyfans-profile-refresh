@@ -255,16 +255,12 @@ class JsExpression
     /** @return list<array{0: string, 1: string}> */
     private function tokenize(string $source): array
     {
-        $pattern = '/\s*(?:(\d+(?:\.\d+)?)|"((?:[^"\\\\]|\\\\.)*)"|([A-Za-z_$][\w$]*)|([-+*\/%()\[\],.]))/A';
+        $pattern = '/(?:(\d+(?:\.\d+)?)|"((?:[^"\\\\]|\\\\.)*)"|([A-Za-z_$][\w$]*)|([-+*\/%()\[\],.]))/A';
         $tokens = [];
         $offset = 0;
         $length = strlen($source);
 
-        while ($offset < $length) {
-            if (trim(substr($source, $offset)) === '') {
-                break;
-            }
-
+        while (($offset += strspn($source, " \t\r\n", $offset)) < $length) {
             if (! preg_match($pattern, $source, $m, 0, $offset)) {
                 throw new InvalidSigningRules('unreadable expression near "'.substr($source, $offset, 20).'"');
             }
@@ -274,7 +270,7 @@ class JsExpression
             if (($m[1] ?? '') !== '') {
                 $tokens[] = ['num', $m[1]];
             } elseif (isset($m[2]) && $m[0] !== '' && str_contains($m[0], '"')) {
-                $tokens[] = ['str', json_decode('"'.preg_replace('/\\\\x([0-9a-fA-F]{2})/', '\\u00$1', $m[2]).'"') ?? throw new InvalidSigningRules('unreadable string')];
+                $tokens[] = ['str', WebAppRulesExtractor::jsString($m[2])];
             } elseif (($m[3] ?? '') !== '') {
                 $tokens[] = ['id', $m[3]];
             } elseif ($m[4] === '.') {

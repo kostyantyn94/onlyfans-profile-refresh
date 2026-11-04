@@ -8,12 +8,17 @@ use GuzzleHttp\Cookie\SetCookie;
  * What an OnlyFans browser session sends with every api2 request: the user id
  * ("0" for a guest), the x-bc token the web app keeps in local storage, the
  * user agent, and the cookies OnlyFans has set (sess, __cf_bm, ...).
+ *
+ * Cookies keep their expiry (__cf_bm lives 30 minutes) and are not sent once it
+ * has passed. Domain and Path are not kept: a session belongs to one account,
+ * whose requests all go to the same host, and OnlyFans sets its cookies for "/".
  */
 final readonly class Session
 {
     /**
      * @param  array<string, string>  $cookies  name => value
      * @param  string  $basis  what the session was built from: "guest", or a hash of the account's credentials
+     * @param  array<string, int>  $expires  name => Unix time the cookie expires (none: until the session ends)
      */
     public function __construct(
         public string $userId,
@@ -21,6 +26,7 @@ final readonly class Session
         public string $userAgent,
         public array $cookies,
         public string $basis,
+        public array $expires = [],
     ) {}
 
     public static function guest(string $userAgent): self
@@ -36,7 +42,17 @@ final readonly class Session
 
     public function cookieHeader(): string
     {
-        return implode('; ', array_map(fn ($name, $value) => $name.'='.$value, array_keys($this->cookies), $this->cookies));
+        $cookies = $this->liveCookies();
+
+        return implode('; ', array_map(fn ($name, $value) => $name.'='.$value, array_keys($cookies), $cookies));
+    }
+
+    /** @return array<string, string> the cookies whose expiry has not passed */
+    public function liveCookies(): array
+    {
+        $now = now()->timestamp;
+
+        return array_filter($this->cookies, fn (string $name) => ($this->expires[$name] ?? PHP_INT_MAX) > $now, ARRAY_FILTER_USE_KEY);
     }
 
     /**
@@ -47,7 +63,8 @@ final readonly class Session
      */
     public function withSetCookies(array $setCookieHeaders): self
     {
-        $cookies = $this->cookies;
+        $cookies = $this->liveCookies();
+        $expires = array_intersect_key($this->expires, $cookies);
 
         foreach ($setCookieHeaders as $header) {
             $cookie = SetCookie::fromString($header);
@@ -60,16 +77,28 @@ final readonly class Session
                 continue;
             }
 
-            $deleted = $value === '' || $cookie->isExpired() || ($cookie->getMaxAge() !== null && $cookie->getMaxAge() <= 0);
+            // Max-Age wins over Expires, as in browsers.
+            $expiresAt = match (true) {
+                $cookie->getMaxAge() !== null => now()->timestamp + (int) $cookie->getMaxAge(),
+                is_numeric($cookie->getExpires()) => (int) $cookie->getExpires(),
+                default => null,
+            };
 
-            if ($deleted) {
-                unset($cookies[$name]);
-            } else {
-                $cookies[$name] = $value;
+            if ($value === '' || ($expiresAt !== null && $expiresAt <= now()->timestamp)) {
+                unset($cookies[$name], $expires[$name]);
+
+                continue;
+            }
+
+            $cookies[$name] = $value;
+            unset($expires[$name]);
+
+            if ($expiresAt !== null) {
+                $expires[$name] = $expiresAt;
             }
         }
 
-        return new self($this->userId, $this->xBc, $this->userAgent, $cookies, $this->basis);
+        return new self($this->userId, $this->xBc, $this->userAgent, $cookies, $this->basis, $expires);
     }
 
     /** Cookies from a "name=value; name2=value2" header, as copied from a browser. */
@@ -96,11 +125,12 @@ final readonly class Session
             'user_agent' => $this->userAgent,
             'cookies' => $this->cookies,
             'basis' => $this->basis,
+            'expires' => $this->expires,
         ];
     }
 
     public static function fromArray(array $data): self
     {
-        return new self((string) $data['user_id'], (string) $data['x_bc'], (string) $data['user_agent'], (array) $data['cookies'], (string) $data['basis']);
+        return new self((string) $data['user_id'], (string) $data['x_bc'], (string) $data['user_agent'], (array) $data['cookies'], (string) $data['basis'], (array) ($data['expires'] ?? []));
     }
 }

@@ -17,7 +17,7 @@ class WebAppRulesExtractorTest extends TestCase
         'prefix' => '13579',
         'suffix' => '2468aceb',
         'checksum_indexes' => [0, 3, 3, 5, 8, 11, 11, 11, 14, 17, 19, 20, 22, 24, 24, 25, 27, 28, 30, 31, 31, 32, 33, 34, 35, 36, 36, 37, 38, 38, 39, 39],
-        'checksum_constant' => -1634,
+        'checksum_constant' => -1517,
     ];
 
     public static function rotations(): array
@@ -40,13 +40,40 @@ class WebAppRulesExtractorTest extends TestCase
         $this->assertSame(SyntheticWebApp::RELEASE, $rules->release);
     }
 
-    public function test_the_code_is_never_run(): void
+    public function test_the_rules_are_decoded_from_the_code_not_found_in_it_as_text(): void
     {
-        // Strings the code would only produce by running are not in the chunk itself.
         $chunk = (new SyntheticWebApp(self::RULES))->chunk();
 
+        // Neither the values nor the names of what computes them appear as text...
         $this->assertStringNotContainsString(self::RULES['static_param'], $chunk);
-        $this->assertStringNotContainsString('charCodeAt', $chunk);
+        $this->assertStringNotContainsString(self::RULES['suffix'], $chunk);
+        $this->assertStringNotContainsString('Math.abs', $chunk);
+
+        // ...so the extractor can only have them by decoding the strings and
+        // evaluating the expressions as the code would.
+        $rules = (new WebAppRulesExtractor)->extract($chunk, '0123456789abcdef0123456789abcdef');
+        $this->assertSame([self::RULES['static_param'], self::RULES['suffix']], [$rules->staticParam, $rules->suffix]);
+    }
+
+    public function test_a_helper_value_that_goes_on_after_the_string_is_refused(): void
+    {
+        // e.g. {k: o(12,"x").split("").reverse().join("")}: taking just o(12,"x")
+        // would give a reversed static param that still looks valid.
+        $chunk = preg_replace('/(Ystat\w{3}:o\(-?\d+,"[^"]*"\))/', '$1.split("").reverse().join("")',
+            (new SyntheticWebApp(self::RULES))->chunk(), 1, $count);
+        $this->assertSame(1, $count);
+
+        $this->expectException(InvalidSigningRules::class);
+        $this->expectExceptionMessage('static_param');
+
+        (new WebAppRulesExtractor)->extract($chunk, '0123456789abcdef0123456789abcdef');
+    }
+
+    public function test_string_literals_are_unescaped_in_one_pass(): void
+    {
+        $this->assertSame('A', WebAppRulesExtractor::jsString('\x41'));
+        $this->assertSame('a\x41b', WebAppRulesExtractor::jsString('a\\\\x41b'), 'an escaped backslash, then the text x41');
+        $this->assertSame('say "hi"', WebAppRulesExtractor::jsString('say \\"hi\\"'));
     }
 
     public function test_a_subtracted_digest_character_is_refused(): void

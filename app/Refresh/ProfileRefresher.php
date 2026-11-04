@@ -54,8 +54,8 @@ class ProfileRefresher
         $context = $this->context($job, $profile, $attempt);
 
         if ($attempt > $this->attemptBudget()) {
-            // Only reachable through a redelivery (a worker died after recording
-            // its last attempt): the budget is checked before every call.
+            // Only reachable through a redelivery (a worker died after its last
+            // call): the budget is checked before every call.
             $this->budgetUsedUp($job, $profile, $context);
 
             return;
@@ -72,7 +72,7 @@ class ProfileRefresher
                 return;
             }
 
-            [$response, $snapshot] = $result;
+            [$response, $snapshot, $row] = $result;
 
             if (! $this->cacheTooOld($snapshot)) {
                 break;
@@ -82,21 +82,21 @@ class ProfileRefresher
                 .config('services.fansapi.max_cache_age_minutes').' min';
 
             if ($fresh) {
-                $this->failed($job, $profile, $attempt, Outcome::CacheStillTooOld, $reason.' even with ?fresh=true', $response, $context);
+                $this->failed($job, $profile, $row, $attempt, Outcome::CacheStillTooOld, $reason.' even with ?fresh=true', $response, $context);
 
                 return;
             }
 
             if ($attempt >= $this->attemptBudget()) {
                 // No attempt left for the live request: a failed refresh, never a stale success.
-                $this->failed($job, $profile, $attempt, Outcome::CacheTooOld, $reason.'; no attempt left to ask for live data', $response, $context);
+                $this->failed($job, $profile, $row, $attempt, Outcome::CacheTooOld, $reason.'; no attempt left to ask for live data', $response, $context);
 
                 return;
             }
 
             // Fans API answered from a cached snapshot older than we accept: that
             // is not a refresh. Record it and ask once more for live data.
-            $this->recordAttempt($job, $profile, $attempt, Outcome::CacheTooOld, $response, revision: $snapshot->revision, likes: $snapshot->likes);
+            $this->finishAttempt($row, Outcome::CacheTooOld, $response, revision: $snapshot->revision, likes: $snapshot->likes);
             Log::channel('refresh')->info('refresh.cache_too_old', [...$context, 'cached_at' => $snapshot->cachedAt->toIso8601String()]);
 
             $context['upstream_attempt'] = ++$attempt;
@@ -105,11 +105,11 @@ class ProfileRefresher
 
         $this->crashForTest($job, 'before-write', $context);
 
-        // The profile write and the attempt that produced it commit together: a
-        // crash leaves either both or neither, never data without its audit row.
-        $outcome = DB::transaction(function () use ($job, $profile, $snapshot, $attempt, $response) {
+        // The profile write and the attempt's result commit together: a crash
+        // leaves either both or neither, never data without its audit row.
+        $outcome = DB::transaction(function () use ($job, $profile, $snapshot, $row, $response) {
             $outcome = $this->store->apply($profile, $snapshot, $job->refreshId, CarbonImmutable::now());
-            $this->recordAttempt($job, $profile, $attempt, $outcome, $response, revision: $snapshot->revision, likes: $snapshot->likes);
+            $this->finishAttempt($row, $outcome, $response, revision: $snapshot->revision, likes: $snapshot->likes);
 
             return $outcome;
         });
@@ -132,41 +132,56 @@ class ProfileRefresher
      * One upstream call that ends in a validated snapshot, or null after the
      * failure has been recorded (and the job released or finished).
      *
-     * @return array{0: UpstreamResponse, 1: ProfileSnapshot}|null
+     * @return array{0: UpstreamResponse, 1: ProfileSnapshot, 2: RefreshAttempt}|null
      */
     private function fetchValid(RefreshProfile $job, Profile $profile, int $attempt, array $context, bool $fresh): ?array
     {
+        // The attempt is recorded before the call, in its own commit, so the budget
+        // counts every request sent: also one whose worker dies before the answer
+        // is stored (it stays "in_flight", and a redelivery makes the next one).
+        $row = $this->startAttempt($job, $profile);
+
         try {
             $response = $this->clients->for($profile->account)->fetchProfile($profile->account, $profile->username, $fresh);
         } catch (ConnectionException $e) {
-            $this->failed($job, $profile, $attempt, Outcome::Timeout, $this->clean($e->getMessage()), null, $context);
+            $this->failed($job, $profile, $row, $attempt, Outcome::Timeout, $this->clean($e->getMessage()), null, $context);
 
             return null;
         } catch (SigningRulesUnavailable $e) {
-            // Recorded as an attempt although nothing was sent, so the retry
-            // budget bounds how long a refresh waits for usable rules.
-            $this->failed($job, $profile, $attempt, Outcome::RulesUnavailable, $e->getMessage(), null, $context);
+            if ($e->loading) {
+                // Another worker is loading the rules this moment: nothing was sent and
+                // nothing is decided yet, so no attempt is spent. Try again shortly.
+                $row->delete();
+                Log::channel('refresh')->debug('refresh.deferred', [...$context, 'reason' => 'signing_rules_loading', 'delay_seconds' => 3]);
+                $job->release(3);
+
+                return null;
+            }
+
+            // No usable rules: recorded as an attempt although nothing was sent, so
+            // the retry budget bounds how long a refresh waits for them.
+            $this->failed($job, $profile, $row, $attempt, Outcome::RulesUnavailable, $e->getMessage(), null, $context);
 
             return null;
         }
 
         if ($response->signatureRejected) {
-            $this->failed($job, $profile, $attempt, Outcome::SignatureRejected, 'HTTP 400: OnlyFans rejected the request signature', $response, $context);
+            $this->failed($job, $profile, $row, $attempt, Outcome::SignatureRejected, 'HTTP 400: OnlyFans rejected the request signature', $response, $context);
 
             return null;
         }
 
         if ($response->status < 200 || $response->status >= 300) {
             $reason = "HTTP {$response->status}".($response->body === '' ? ' with an empty body' : '');
-            $this->failed($job, $profile, $attempt, Outcome::fromHttpStatus($response->status), $reason, $response, $context);
+            $this->failed($job, $profile, $row, $attempt, Outcome::fromHttpStatus($response->status), $reason, $response, $context);
 
             return null;
         }
 
         try {
-            return [$response, $this->parser->parse($response->body, $response->sentAtMs)];
+            return [$response, $this->parser->parse($response->body, $response->sentAtMs), $row];
         } catch (InvalidProfilePayload $e) {
-            $this->failed($job, $profile, $attempt, Outcome::InvalidResponse, 'invalid response: '.$e->getMessage(), $response, $context);
+            $this->failed($job, $profile, $row, $attempt, Outcome::InvalidResponse, 'invalid response: '.$e->getMessage(), $response, $context);
 
             return null;
         }
@@ -208,7 +223,7 @@ class ProfileRefresher
         Log::channel('refresh')->error('refresh.gave_up', [...$this->context($job, $profile), 'reason' => $reason]);
     }
 
-    private function failed(RefreshProfile $job, Profile $profile, int $attempt, Outcome $outcome, string $reason, ?UpstreamResponse $response, array $context): void
+    private function failed(RefreshProfile $job, Profile $profile, RefreshAttempt $row, int $attempt, Outcome $outcome, string $reason, ?UpstreamResponse $response, array $context): void
     {
         $now = CarbonImmutable::now();
         $sameKind = RefreshAttempt::query()
@@ -231,9 +246,9 @@ class ProfileRefresher
             $delay = null;
         }
 
-        DB::transaction(function () use ($job, $profile, $attempt, $outcome, $reason, $response, $final, $delay, $now) {
+        DB::transaction(function () use ($job, $profile, $row, $outcome, $reason, $response, $final, $delay, $now) {
             $this->store->recordFailure($profile, $outcome, $reason, $job->refreshId, $final, $now);
-            $this->recordAttempt($job, $profile, $attempt, $outcome, $response, retryIn: $delay, error: $reason);
+            $this->finishAttempt($row, $outcome, $response, retryIn: $delay, error: $reason);
         });
 
         Log::channel('refresh')->log($final ? 'error' : 'warning', $final ? 'refresh.failed' : 'refresh.retry_scheduled', [
@@ -257,20 +272,29 @@ class ProfileRefresher
         $budget = config('refresh.retry.'.$outcome->value) ?? config('refresh.retry.server_error');
         $delay = Backoff::seconds($sameKind, (float) $budget['base_seconds'], (float) $budget['cap_seconds']);
 
-        return $outcome === Outcome::RateLimited
+        // Retry-After is honoured where it is sent: 429, and 503 during maintenance.
+        return in_array($outcome, [Outcome::RateLimited, Outcome::ServerError], true)
             ? Backoff::retryAfter($response?->retryAfter, $now, 300) ?? $delay
             : $delay;
     }
 
-    private function recordAttempt(RefreshProfile $job, Profile $profile, int $attempt, Outcome $outcome, ?UpstreamResponse $response, ?int $revision = null, ?int $likes = null, ?int $retryIn = null, ?string $error = null): void
+    private function startAttempt(RefreshProfile $job, Profile $profile): RefreshAttempt
     {
-        RefreshAttempt::query()->create([
+        return RefreshAttempt::query()->create([
             'profile_id' => $profile->id,
             'account_id' => $profile->account_id,
             'refresh_id' => $job->refreshId,
             'job_id' => $job->job?->getJobId(),
             'job_attempt' => $job->job ? $job->attempts() : null,
             'handler' => 'v2',
+            'outcome' => Outcome::InFlight->value,
+            'duration_ms' => 0,
+        ]);
+    }
+
+    private function finishAttempt(RefreshAttempt $row, Outcome $outcome, ?UpstreamResponse $response, ?int $revision = null, ?int $likes = null, ?int $retryIn = null, ?string $error = null): void
+    {
+        $row->update([
             'outcome' => $outcome->value,
             'http_status' => $response?->status,
             'revision' => $revision,

@@ -2,6 +2,7 @@
 
 namespace App\Upstream\OnlyFans;
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -19,7 +20,10 @@ class WebAppRulesSource
 {
     public function __construct(private WebAppRulesExtractor $extractor) {}
 
-    /** @throws InvalidSigningRules */
+    /**
+     * @throws InvalidSigningRules the release's code does not read as expected (remembered for 10 minutes)
+     * @throws WebAppUnreachable|ConnectionException a download failed (not remembered)
+     */
     public function load(string $pageUrl, float $deadline): SigningRules
     {
         $started = microtime(true);
@@ -36,8 +40,9 @@ class WebAppRulesSource
             return SigningRules::fromArray($cached, $source);
         }
 
-        // A release that could not be read is not downloaded again on every reload
-        // (a rejected signature reloads the rules at once): the next source is used meanwhile.
+        // A release whose code could not be read is not downloaded again on every
+        // reload (a rejected signature reloads the rules): the next source is used
+        // meanwhile. A failed download is not a verdict on the code: not remembered.
         $failed = $release === null ? null : Cache::get($this->failedKey($release));
 
         if (is_array($failed) && (int) $failed['at'] > now()->subMinutes(10)->timestamp) {
@@ -70,12 +75,22 @@ class WebAppRulesSource
 
         // The signing module sits in one of the page's own small scripts.
         $candidates = array_filter($scripts, fn (string $url) => ! str_ends_with($url, '/app.js') && ! str_contains($url, 'chunk-vendors'));
+        $unreachable = null;
 
         foreach (array_slice($candidates, 0, 6) as $url) {
-            $script = $this->get($url, $deadline, 1_000_000);
+            try {
+                $script = $this->get($url, $deadline, 1_000_000);
+            } catch (WebAppUnreachable|ConnectionException $e) {
+                // Maybe not the script we need: look at the others first.
+                $unreachable = $e;
 
-            if (str_contains($script, $signerId.':function(')) {
-                $rules = $this->extractor->extract($script, $appToken, $source, $release);
+                continue;
+            }
+
+            $module = $this->module($script, $signerId);
+
+            if ($module !== null) {
+                $rules = $this->extractor->extract($module, $appToken, $source, $release);
 
                 Log::channel('refresh')->info('onlyfans.webapp_rules_read', [
                     'release' => $release,
@@ -88,7 +103,24 @@ class WebAppRulesSource
             }
         }
 
-        throw new InvalidSigningRules("signing module {$signerId} not found in the page's scripts");
+        throw $unreachable !== null
+            ? new WebAppUnreachable("signing module {$signerId} not found; a script could not be read: ".$unreachable->getMessage())
+            : new InvalidSigningRules("signing module {$signerId} not found in the page's scripts");
+    }
+
+    /** The webpack module with this id, from its "802313:function(" to the next module or the end. */
+    private function module(string $script, string $id): ?string
+    {
+        if (! preg_match('/(?<![\w$])'.$id.':function\(\w+,\w+,\w+\)\{/', $script, $start, PREG_OFFSET_CAPTURE)) {
+            return null;
+        }
+
+        $from = $start[0][1];
+        $to = preg_match('/,\d+:function\(\w+,\w+,\w+\)\{/', $script, $next, PREG_OFFSET_CAPTURE, $from + strlen($start[0][0]))
+            ? $next[0][1]
+            : strlen($script);
+
+        return substr($script, $from, $to - $from);
     }
 
     /**
@@ -122,7 +154,7 @@ class WebAppRulesSource
         $left = $deadline - microtime(true);
 
         if ($left < 1) {
-            throw new InvalidSigningRules('no time left to read the web app');
+            throw new WebAppUnreachable('no time left to read the web app');
         }
 
         $response = Http::withUserAgent((string) config('services.onlyfans.user_agent'))
@@ -131,7 +163,7 @@ class WebAppRulesSource
             ->get($url);
 
         if (! $response->successful()) {
-            throw new InvalidSigningRules('HTTP '.$response->status().' for '.$url);
+            throw new WebAppUnreachable('HTTP '.$response->status().' for '.$url);
         }
 
         $body = $response->body();

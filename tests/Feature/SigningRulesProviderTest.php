@@ -6,6 +6,7 @@ use App\Upstream\OnlyFans\SigningRulesProvider;
 use App\Upstream\OnlyFans\SigningRulesUnavailable;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Redis;
 use Tests\Support\SyntheticWebApp;
 use Tests\TestCase;
 
@@ -54,6 +55,63 @@ class SigningRulesProviderTest extends TestCase
         $this->provider->reject(self::BASE, $rules, str_repeat('b', 40));
 
         $this->assertSame('67890', $this->provider->for(self::BASE)->prefix);
+    }
+
+    public function test_rules_onlyfans_accepted_recently_are_not_blamed_for_rejections(): void
+    {
+        $rules = $this->provider->for(self::BASE);
+        $this->provider->accepted(self::BASE, $rules);
+
+        // Two distrusted sessions: their rejections are the sessions', not the rules'.
+        $this->provider->reject(self::BASE, $rules, str_repeat('a', 40));
+        $this->provider->reject(self::BASE, $rules, str_repeat('b', 40));
+        $this->assertSame('12345', $this->provider->for(self::BASE)->prefix);
+        $this->assertTrue(collect($this->refreshLogLines())->firstWhere('message', 'onlyfans.signature_rejected')['context']['rules_proven']);
+
+        // Not accepted for 10 minutes and rejected for two sessions: skipped.
+        $this->travel(11)->minutes();
+        $this->provider->reject(self::BASE, $rules, str_repeat('c', 40));
+        $this->provider->reject(self::BASE, $rules, str_repeat('d', 40));
+        $this->assertSame('67890', $this->provider->for(self::BASE)->prefix);
+    }
+
+    public function test_the_rejection_window_does_not_slide(): void
+    {
+        config(['services.onlyfans.rules_reject_limit' => 3]);
+        $rules = $this->provider->for(self::BASE);
+        $this->provider->reject(self::BASE, $rules, str_repeat('a', 40));
+        $key = 'onlyfans:rules-rejected:upstream.test:'.$rules->fingerprint();
+        Redis::expire($key, 100);
+
+        $this->provider->reject(self::BASE, $rules, str_repeat('b', 40));
+
+        $this->assertLessThanOrEqual(100, Redis::ttl($key), 'a later rejection does not extend the window');
+        $this->assertSame(2, (int) Redis::scard($key));
+    }
+
+    public function test_a_response_from_a_newer_web_app_release_reloads_the_rules(): void
+    {
+        $web = new SyntheticWebApp(self::WEB_RULES);
+        config(['services.onlyfans.rules_sources' => ['upstream.test' => ['webapp:https://upstream.test/']]]);
+        Http::fake([
+            'upstream.test/' => Http::response($web->page()),
+            SyntheticWebApp::BASE.'app.js' => Http::response($web->app()),
+            SyntheticWebApp::BASE.'7777.js' => Http::response($web->chunk()),
+        ]);
+        $rules = $this->provider->for(self::BASE);
+        Http::assertSentCount(3);
+
+        // Same release, or an older one: nothing to do.
+        $this->provider->accepted(self::BASE, $rules, SyntheticWebApp::RELEASE);
+        $this->provider->accepted(self::BASE, $rules, '202601010000-0000000000');
+        $this->provider->for(self::BASE);
+        Http::assertSentCount(3);
+
+        // OnlyFans answers from a newer release: the next request reloads (here
+        // the page still names the old release, so only the page is read).
+        $this->provider->accepted(self::BASE, $rules, '202611050900-0123456789');
+        $this->provider->for(self::BASE);
+        Http::assertSentCount(4);
     }
 
     public function test_a_failed_load_is_remembered_instead_of_asking_the_sources_again(): void
@@ -147,16 +205,31 @@ class SigningRulesProviderTest extends TestCase
         $this->provider->for(self::BASE);
         Http::assertSentCount(3);
 
-        // A rejection reloads at once: only the page is read, the release is known to be unreadable.
-        $this->provider->forget(self::BASE);
-        $this->assertSame('12345', $this->provider->for(self::BASE)->prefix);
+        // Reloaded soon after (e.g. after a rejection): only the page is read,
+        // the release is known to be unreadable.
+        $this->assertSame('12345', $this->provider->reloadNow(self::BASE)->prefix);
         Http::assertSentCount(4);
 
         // Ten minutes later the release's code is read again.
         $this->travel(11)->minutes();
-        $this->provider->forget(self::BASE);
-        $this->provider->for(self::BASE);
+        $this->provider->reloadNow(self::BASE);
         Http::assertSentCount(7);
+    }
+
+    public function test_a_download_failure_is_not_taken_for_unreadable_code(): void
+    {
+        $web = new SyntheticWebApp(self::WEB_RULES);
+        config(['services.onlyfans.rules_sources' => ['upstream.test' => ['webapp:https://upstream.test/', self::FIRST]]]);
+        Http::fake([
+            'upstream.test/' => Http::response($web->page()),
+            SyntheticWebApp::BASE.'app.js' => Http::sequence()->push('', 503)->push($web->app()),
+            SyntheticWebApp::BASE.'7777.js' => Http::response($web->chunk()),
+        ]);
+
+        $this->assertSame('12345', $this->provider->for(self::BASE)->prefix, 'a passing 503: the next source for now');
+
+        // Not remembered as an unreadable release: the next load reads the web app.
+        $this->assertSame('55555', $this->provider->reloadNow(self::BASE)->prefix);
     }
 
     public function test_the_rules_in_use_and_their_source_can_be_shown(): void

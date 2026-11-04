@@ -33,6 +33,11 @@ enum Outcome: string
     // The job kept throwing or crashing its worker: the refresh is abandoned.
     case GaveUp = 'gave_up';
 
+    // Written just before the request is sent and replaced by its result. One left
+    // behind is a request whose worker died before recording the answer: it still
+    // counts towards the refresh's attempts.
+    case InFlight = 'in_flight';
+
     public static function fromHttpStatus(int $status): self
     {
         return match (true) {

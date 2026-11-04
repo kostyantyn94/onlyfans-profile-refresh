@@ -76,6 +76,12 @@ class RealWorkerTest extends TestCase
         app(RefreshScheduler::class)->enqueue($profile);
         $this->work();
         $this->work();
+        $this->assertSame(1, RefreshAttempt::query()->count(), 'backed off: not run again at once');
+
+        // 10 s, then 60 s apart, so a short database outage does not use them all up.
+        $this->travel(11)->seconds();
+        $this->work();
+        $this->travel(61)->seconds();
         $this->work();
 
         $profile->refresh();
@@ -83,6 +89,8 @@ class RealWorkerTest extends TestCase
         $this->assertNull($profile->pending_refresh_id, 'the claim is given back');
         $this->assertSame(120_000, $profile->likes_count);
         $this->assertSame(1, DB::table('failed_jobs')->count());
+        $this->assertSame(['in_flight', 'in_flight', 'in_flight'], RefreshAttempt::query()->orderBy('id')->pluck('outcome')->all(),
+            'each call whose result was never recorded still counts as an attempt');
     }
 
     public function test_a_queued_job_replaced_after_its_claim_expired_stops_without_calling_the_upstream(): void

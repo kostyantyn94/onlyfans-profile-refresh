@@ -110,13 +110,20 @@ class ProfilePayloadParser
         // Fans API has no revision. The time Fans API took the snapshot from
         // OnlyFans grows with every new snapshot, so it orders responses the
         // same way; without it, fall back to when we sent the request.
-        $cachedAtMs = $this->cachedAt($json['_meta']['_cache'] ?? null);
+        $cache = $json['_meta']['_cache'] ?? null;
+        $cachedAtMs = $this->cachedAt($cache);
         $revision = $cachedAtMs ?? $fallbackRevision;
 
-        // The snapshot's age is judged by cached_at alone, whatever is_cached
-        // says: an answer marked live but taken hours ago is still old.
-        return new ProfileSnapshot($likes, $revision, 'fansapi', $this->attributes($data), $data,
-            $cachedAtMs !== null ? CarbonImmutable::createFromTimestampMs($cachedAtMs) : null);
+        // The snapshot's age is judged by cached_at, whatever is_cached says: an
+        // answer marked live but taken hours ago is still old. A cached answer
+        // without a usable cached_at is of unknown age: treated as too old.
+        $cachedAt = match (true) {
+            $cachedAtMs !== null => CarbonImmutable::createFromTimestampMs($cachedAtMs),
+            is_array($cache) && ($cache['is_cached'] ?? false) === true => CarbonImmutable::createFromTimestampMs(0),
+            default => null,
+        };
+
+        return new ProfileSnapshot($likes, $revision, 'fansapi', $this->attributes($data), $data, $cachedAt);
     }
 
     private function fromRevisioned(array $json): ProfileSnapshot
@@ -174,15 +181,18 @@ class ProfilePayloadParser
 
     private function cachedAt(mixed $cache): ?int
     {
-        if (! is_array($cache) || ! is_string($cache['cached_at'] ?? null)) {
+        if (! is_array($cache) || ! is_string($cache['cached_at'] ?? null) || trim($cache['cached_at']) === '') {
             return null;
         }
 
         try {
-            return (int) CarbonImmutable::parse($cache['cached_at'])->getTimestampMs();
+            $cachedAt = CarbonImmutable::parse($cache['cached_at']);
         } catch (Throwable) {
             return null;
         }
+
+        // A time in the future is not a time the snapshot was taken.
+        return $cachedAt->gt(CarbonImmutable::now()->addMinutes(5)) ? null : (int) $cachedAt->getTimestampMs();
     }
 
     /**
