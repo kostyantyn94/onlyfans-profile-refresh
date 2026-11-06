@@ -158,7 +158,9 @@ code and fixed with a test unless noted:
 - **Defaults:** third-party rule feeds were in the default path, and they are now opt-in. The UI
   port was published on all interfaces, so the read-only demo could be bypassed from the network; it
   is now 127.0.0.1 only. The README was reordered to lead with the data retrieval, and the evidence
-  re-recorded on the final code, each file stamped with its commit.
+  re-recorded, each file stamped with its commit: the workloads at 3665d45 (later commits changed
+  only how rules are read from OnlyFans' web app, which the local workloads do not use), the test
+  suite, the rules and the live check at the final code.
 **Fifth independent review** (two reviewers, of the code and documents after the fourth), all
 confirmed and fixed with a test:
 
