@@ -29,6 +29,11 @@ class WebAppRulesExtractor
 
     private const MAX_STRINGS = 5_000;
 
+    // A call with literal arguments, the number and the key in either order (the
+    // obfuscator varies it per wrapper): o(-290,"k") or o("k",-290). Two groups:
+    // the function's name and the argument list.
+    private const CALL = '(\w+)\((-?\d+,"(?:[^"\\\\]|\\\\.)*"|"(?:[^"\\\\]|\\\\.)*",-?\d+)\)';
+
     /** @var list<string> the string array, rotated into place */
     private array $strings = [];
 
@@ -60,32 +65,42 @@ class WebAppRulesExtractor
         $this->rotate($chunk);
 
         // The signing function: n.A=W=>{const n={...};function o(W,n){return i(W- -752,n)}...
-        if (! preg_match('/=\w+=>\{const (\w+)=\{(.*?)\};(function \w+\(\w+,\w+\)\{return \w+\(\w+\s*-\s*-?\s*\d+,\w+\)\})/s', $chunk, $m, PREG_OFFSET_CAPTURE)) {
+        // The helper object is cut out by matching its braces: what follows it varies
+        // (";function o(...)" on 3 Nov 2026, ",c=e()(...),...;function r(...)" on 6 Nov).
+        if (! preg_match('/=\w+=>\{const (\w+)=\{/', $chunk, $m, PREG_OFFSET_CAPTURE)) {
             throw new InvalidSigningRules('signing function not found');
         }
 
         $opsName = $m[1][0];
+        $open = $m[0][1] + strlen($m[0][0]) - 1;
+        $opsSource = $this->braced($chunk, $open);
+
+        // The function's own wrapper is the first one defined after the helper object.
+        if (! preg_match('/function \w+\(\w+,\w+\)\{return \w+\(\w+\s*-\s*-?\s*\d+,\w+\)\}/', $chunk, $w, 0, $open + strlen($opsSource) + 2)) {
+            throw new InvalidSigningRules('signing function not found');
+        }
+
         $this->wrappers = [];
-        $this->defineWrapper($m[3][0]);
-        $ops = $this->opsObject($m[2][0]);
+        $this->defineWrapper($w[0]);
+        $ops = $this->opsObject($opsSource);
         $body = substr($chunk, $m[0][1]);
 
         // [n[o(..)], r[o(..)], t, e||0][o(..)]("\n"): static_param, time, path, user id.
-        $call = '(\w+)\((-?\d+),"((?:[^"\\\\]|\\\\.)*)"\)';
+        $call = self::CALL;
         if (! preg_match('/\['.preg_quote($opsName, '/').'\['.$call.'\],\w+\['.$call.'\],\w+,\w+\|\|0\]\['.$call.'\]\("\\\\n"\)/', $body, $s)) {
             throw new InvalidSigningRules('signed message not found');
         }
 
-        $staticParam = $ops[$this->call($s[1], (int) $s[2], $this->unescape($s[3]))] ?? null;
+        $staticParam = $ops[$this->callLiteral($s[1], $s[2])] ?? null;
 
         // =[n[o(..)],k,function(W){...}(k),n[o(..)]][o(..)](":"): prefix, sha1, checksum, suffix.
-        if (! preg_match('/=\['.preg_quote($opsName, '/').'\['.$call.'\],(\w+),function\((\w+)\)\{(.*?)\}\(\4\),'.preg_quote($opsName, '/').'\['.$call.'\]\]\['.$call.'\]\(":"\)/s', $body, $g)) {
+        if (! preg_match('/=\['.preg_quote($opsName, '/').'\['.$call.'\],(\w+),function\((\w+)\)\{(.*?)\}\(\3\),'.preg_quote($opsName, '/').'\['.$call.'\]\]\['.$call.'\]\(":"\)/s', $body, $g)) {
             throw new InvalidSigningRules('signature assembly not found');
         }
 
-        $prefix = $ops[$this->call($g[1], (int) $g[2], $this->unescape($g[3]))] ?? null;
-        $suffix = $ops[$this->call($g[7], (int) $g[8], $this->unescape($g[9]))] ?? null;
-        [$indexes, $constant] = $this->checksum($g[6], $g[5], $opsName, $ops);
+        $prefix = $ops[$this->callLiteral($g[1], $g[2])] ?? null;
+        $suffix = $ops[$this->callLiteral($g[6], $g[7])] ?? null;
+        [$indexes, $constant] = $this->checksum($g[5], $g[4], $opsName, $ops);
 
         return SigningRules::fromArray([
             'static_param' => $staticParam,
@@ -127,19 +142,23 @@ class WebAppRulesExtractor
     /** Rotate the array as the obfuscated code does, until its parseInt() checksum matches. */
     private function rotate(string $chunk): void
     {
-        $pattern = '/!function\(\w+,\w+\)\{(function \w+\(\w+,\w+\)\{return \w+\(\w+\s*-\s*-?\s*\d+,\w+\)\})const \w+=\w+\(\);for\(;;\)try\{const \w+=void 0;if\((.+?)===\w+\)break;\w+\.push\(\w+\.shift\(\)\)\}catch\(\w+\)\{\w+\.push\(\w+\.shift\(\)\)\}\}\(\w+,(\d+)\)/s';
+        // The wrapper and "const t=W()" come in either order (the obfuscator swapped
+        // them between the releases of 3 and 6 Nov 2026).
+        $wrapper = 'function \w+\(\w+,\w+\)\{return \w+\(\w+\s*-\s*-?\s*\d+,\w+\)\}';
+        $pattern = '/!function\(\w+,\w+\)\{(?:(?<before>'.$wrapper.')const \w+=\w+\(\);|const \w+=\w+\(\);(?<after>'.$wrapper.'))'
+            .'for\(;;\)try\{const \w+=void 0;if\((?<check>.+?)===\w+\)break;\w+\.push\(\w+\.shift\(\)\)\}catch\(\w+\)\{\w+\.push\(\w+\.shift\(\)\)\}\}\(\w+,(?<target>\d+)\)/s';
 
         if (! preg_match($pattern, $chunk, $m)) {
             throw new InvalidSigningRules('string array rotation not found');
         }
 
         $this->wrappers = [];
-        $this->defineWrapper($m[1]);
-        $target = (float) $m[3];
+        $this->defineWrapper(($m['before'] ?? '') !== '' ? $m['before'] : $m['after']);
+        $target = (float) $m['target'];
 
         for ($turn = 0; $turn < count($this->strings); $turn++) {
             try {
-                $value = (new JsExpression($m[2], fn (string $name, array $args) => match ($name) {
+                $value = (new JsExpression($m['check'], fn (string $name, array $args) => match ($name) {
                     'parseInt' => self::parseInt((string) $args[0]),
                     default => $this->call($name, ...$args),
                 }))->number();
@@ -246,7 +265,7 @@ class WebAppRulesExtractor
     private function opsObject(string $source): array
     {
         $ops = [];
-        $call = '(\w+)\((-?\d+),"((?:[^"\\\\]|\\\\.)*)"\)';
+        $call = self::CALL;
 
         // Each entry must end at a comma or the end of the object: a value that goes on
         // (o(1,"a")+o(2,"b"), o(1,"a").split("")...) is left out, and whatever uses it fails.
@@ -254,7 +273,7 @@ class WebAppRulesExtractor
 
         foreach ($all as $m) {
             if (($m[5] ?? '') !== '') {
-                $ops[$m[1]] = $this->call($m[5], (int) $m[6], $this->unescape($m[7]));
+                $ops[$m[1]] = $this->callLiteral($m[5], $m[6]);
             } else {
                 $ops[$m[1]] = match ($m[4]) {
                     "{$m[2]}+{$m[3]}" => '+',
@@ -276,7 +295,7 @@ class WebAppRulesExtractor
     private function checksum(string $body, string $digest, string $opsName, array $ops): array
     {
         // return Math[t(..)](EXPRESSION)[t(..)](16): Math.abs(...).toString(16)
-        $call = '\w+\(-?\d+,"(?:[^"\\\\]|\\\\.)*"\)';
+        $call = '\w+\((?:-?\d+,"(?:[^"\\\\]|\\\\.)*"|"(?:[^"\\\\]|\\\\.)*",-?\d+)\)';
 
         if (! preg_match('/^(function \w+\(\w+,\w+\)\{return \w+\(\w+\s*-\s*-?\s*\d+,\w+\)\})return (\w+)\[('.$call.')\]\((.+)\)\[('.$call.')\]\(16\)$/s', $body, $m)) {
             throw new InvalidSigningRules('checksum function not understood');
@@ -308,11 +327,46 @@ class WebAppRulesExtractor
 
     private function evaluateKey(string $expression): string
     {
-        if (! preg_match('/^(\w+)\((-?\d+),"((?:[^"\\\\]|\\\\.)*)"\)$/', $expression, $m)) {
+        if (! preg_match('/^'.self::CALL.'$/', $expression, $m)) {
             throw new InvalidSigningRules('unexpected key: '.substr($expression, 0, 40));
         }
 
-        return $this->call($m[1], (int) $m[2], $this->unescape($m[3]));
+        return $this->callLiteral($m[1], $m[2]);
+    }
+
+    /**
+     * What is between the bracket at $open and its partner, skipping string
+     * literals (the decoded keys contain brackets of every kind).
+     */
+    private function braced(string $code, int $open): string
+    {
+        $depth = 0;
+
+        for ($i = $open, $length = strlen($code); $i < $length; $i++) {
+            $char = $code[$i];
+
+            if ($char === '"' || $char === "'") {
+                for ($i++; $i < $length && $code[$i] !== $char; $i++) {
+                    $i += $code[$i] === '\\' ? 1 : 0;
+                }
+            } elseif (str_contains('([{', $char)) {
+                $depth++;
+            } elseif (str_contains(')]}', $char) && --$depth === 0) {
+                return substr($code, $open + 1, $i - $open - 1);
+            }
+        }
+
+        throw new InvalidSigningRules('unbalanced brackets in the signing function');
+    }
+
+    /** A call matched by CALL: its literal arguments, in source order, passed to call(). */
+    private function callLiteral(string $name, string $arguments): string
+    {
+        preg_match('/^(?:(-?\d+),"((?:[^"\\\\]|\\\\.)*)"|"((?:[^"\\\\]|\\\\.)*)",(-?\d+))$/s', $arguments, $a);
+
+        return ($a[1] ?? '') !== ''
+            ? $this->call($name, (int) $a[1], $this->unescape($a[2]))
+            : $this->call($name, $this->unescape($a[3]), (int) $a[4]);
     }
 
     /** JavaScript's parseInt(): leading integer, or NaN. */

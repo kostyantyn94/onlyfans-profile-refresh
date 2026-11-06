@@ -22,13 +22,19 @@ class WebAppRulesExtractorTest extends TestCase
 
     public static function rotations(): array
     {
-        return ['shipped in order' => [0], 'rotated by 1' => [1], 'rotated by 17' => [17]];
+        return [
+            'shipped in order' => [0, false],
+            'rotated by 1' => [1, false],
+            'rotated by 17' => [17, false],
+            // OnlyFans' 6 Nov 2026 release: statements in another order, the key first in the checksum's calls.
+            'the later shape, rotated by 5' => [5, true],
+        ];
     }
 
     #[DataProvider('rotations')]
-    public function test_it_recovers_the_rules_the_code_was_built_from(int $rotation): void
+    public function test_it_recovers_the_rules_the_code_was_built_from(int $rotation, bool $laterShape): void
     {
-        $chunk = (new SyntheticWebApp(self::RULES, $rotation))->chunk();
+        $chunk = (new SyntheticWebApp(self::RULES, $rotation, laterShape: $laterShape))->chunk();
 
         $rules = (new WebAppRulesExtractor)->extract($chunk, '0123456789abcdef0123456789abcdef', 'webapp:test', SyntheticWebApp::RELEASE);
 

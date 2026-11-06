@@ -28,8 +28,12 @@ final class SyntheticWebApp
 
     /**
      * @param  array{static_param: string, prefix: string, suffix: string, checksum_indexes: list<int>, checksum_constant: int}  $rules
+     * @param  bool  $laterShape  the obfuscator's output as of OnlyFans' 6 Nov 2026 release: in the
+     *                            rotation loop the wrapper comes after "const t=W()"; the helper
+     *                            object is followed by more declarations before the signing
+     *                            function's wrapper; the checksum's wrapper takes the key first
      */
-    public function __construct(private array $rules, private int $rotation = 3, private bool $subtractACharacter = false) {}
+    public function __construct(private array $rules, private int $rotation = 3, private bool $subtractACharacter = false, private bool $laterShape = false) {}
 
     public function page(): string
     {
@@ -62,9 +66,10 @@ final class SyntheticWebApp
         $suffixKey = $this->name('Isuff');
 
         // Wrappers: in the rotation loop o(key, n) = i(n + 100, key); in the
-        // signing function o(n, key) = i(n + 500, key); in the checksum t(n, key) = o(n - 50, key).
+        // signing function o(n, key) = i(n + 500, key); in the checksum t(n, key) = o(n - 50, key),
+        // or t(key, n) in the later shape.
         $sign = fn (string $s) => $this->wrap($s, 500, 'o');
-        $check = fn (string $s) => $this->wrap($s, 450, 't');
+        $check = fn (string $s) => $this->wrap($s, 450, 't', keyFirst: $this->laterShape);
 
         $terms = [];
         $constants = $this->splitConstant(count($r['checksum_indexes']), $r['checksum_constant']);
@@ -104,18 +109,25 @@ final class SyntheticWebApp
             $suffixKey.':'.$sign($r['suffix']),
         ]);
 
-        $signing = 'n.A=W=>{const n={'.$ops.'};function o(W,n){return i(W- -500,n)}'
-            .'const t=n['.$sign($call3).'](u(),W,'.$sign('url').',""),r={};r['.$sign('time').']=+new Date;'
+        $wrapper = 'function o(W,n){return i(W- -500,n)}';
+        $path = 't=n['.$sign($call3).'](u(),W,'.$sign('url').',""),r={};';
+        $signing = 'n.A=W=>{const n={'.$ops.'}'
+            .($this->laterShape ? ','.$path.$wrapper : ';'.$wrapper.'const '.$path)
+            .'r['.$sign('time').']=+new Date;'
             .'const e=n['.$sign($call3).'](u(),f.A,'.$sign('auth.user.id').',null),'
             .'k=d()([n['.$sign($staticKey).'],r['.$sign('time').'],t,e||0]['.$sign('join').']("\\n"));'
-            .'return r['.$sign('sign').']=[n['.$sign($prefixKey).'],k,function(W){function t(W,n){return o(W-50,n)}'
+            .'return r['.$sign('sign').']=[n['.$sign($prefixKey).'],k,function(W){'
+            .($this->laterShape ? 'function t(W,n){return o(n-50,W)}' : 'function t(W,n){return o(W-50,n)}')
             .'return Math['.$check('abs').']('.$expression.')['.$check('toString').'](16)}(k),'
             .'n['.$sign($suffixKey).']]['.$sign('join').'](":"),r}';
 
         // The rotation check: parseInt of two strings, which only line up in the true order.
         $first = $this->add('860000xyz');
         $second = $this->add('4000abc');
-        $rotate = '!function(W,n){function o(W,n){return i(n- -100,W)}const t=W();for(;;)try{const W=void 0;'
+        $rotateStart = $this->laterShape
+            ? 'const t=W();function o(W,n){return i(n- -100,W)}'
+            : 'function o(W,n){return i(n- -100,W)}const t=W();';
+        $rotate = '!function(W,n){'.$rotateStart.'for(;;)try{const W=void 0;'
             .'if(parseInt(o("'.$this->strings[$first][1].'",'.($first + self::OFFSET - 100).'))/1+'
             .'-parseInt(o("'.$this->strings[$second][1].'",'.($second + self::OFFSET - 100).'))/2===n)break;'
             .'t.push(t.shift())}catch(c){t.push(t.shift())}}(k,858000)';
@@ -152,12 +164,17 @@ final class SyntheticWebApp
             .'return u}';
     }
 
-    /** A call of wrapper $function that resolves to the string: its index is shifted by $shift on the way to i(). */
-    private function wrap(string $plain, int $shift, string $function): string
+    /**
+     * A call of wrapper $function that resolves to the string: its index is shifted
+     * by $shift on the way to i(). The key comes second, or first with $keyFirst.
+     */
+    private function wrap(string $plain, int $shift, string $function, bool $keyFirst = false): string
     {
         $position = $this->add($plain);
+        $index = $position + self::OFFSET - $shift;
+        $key = '"'.$this->strings[$position][1].'"';
 
-        return $function.'('.($position + self::OFFSET - $shift).',"'.$this->strings[$position][1].'")';
+        return $function.'('.($keyFirst ? $key.','.$index : $index.','.$key).')';
     }
 
     private function name(string $base): string
