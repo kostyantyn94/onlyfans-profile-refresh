@@ -1,36 +1,36 @@
 # Signing rules read from OnlyFans' web app code, live.
-# Commit: 2fd1c6c Evidence re-recorded at the final code (3665d45); numbers in the docs from that run   Run: 2026-11-04T04:02Z
+# Commit: aac6079 Read the signing rules from OnlyFans' 6 Nov release too   Run: 2026-11-06T22:03Z
 
 $ php artisan onlyfans:rules --reload     # reads the page, app.js and the signing script
-+---------------------+---------------------------------------------------------------------------------------------------------+
-| Field               | Value                                                                                                   |
-+---------------------+---------------------------------------------------------------------------------------------------------+
-| upstream            | https://onlyfans.com                                                                                    |
-| source              | webapp:https://onlyfans.com/                                                                            |
-| web app release     | 202611031453-fbc506331f                                                                                 |
-| rules (fingerprint) | 54d826cfd48b                                                                                            |
-| sign                | 67634:<sha1>:<checksum, hex>:6ae9f59b                                                                   |
-| static param        | LVIMTEyGaoXC1Vp1q6i0QuwGciDSyaWw                                                                        |
-| checksum            | sha1 characters at 0,0,1,1,1,1,2,2,3,3,4,4,5,8,8,9,9,10,11,12,12,13,17,17,18,20,21,33,34,34,35,37 -1634 |
-| app-token           | 33d57ade8c02dbc5a333db99ff9ae26a                                                                        |
-| headers left out    | -                                                                                                       |
-+---------------------+---------------------------------------------------------------------------------------------------------+
++---------------------+----------------------------------------------------------------------------------------------------------------+
+| Field               | Value                                                                                                          |
++---------------------+----------------------------------------------------------------------------------------------------------------+
+| upstream            | https://onlyfans.com                                                                                           |
+| source              | webapp:https://onlyfans.com/                                                                                   |
+| web app release     | 202611061539-e69826e739                                                                                        |
+| rules (fingerprint) | 55a00e0a2497                                                                                                   |
+| sign                | 67795:<sha1>:<checksum, hex>:6aedf4bb                                                                          |
+| static param        | nCPoqEMsVhbBb9WC8VvanfVy0UcIaCS8                                                                               |
+| checksum            | sha1 characters at 1,2,3,3,4,6,7,7,8,10,11,11,12,13,14,16,18,19,22,23,24,30,30,32,34,34,34,35,36,37,37,39 -193 |
+| app-token           | 33d57ade8c02dbc5a333db99ff9ae26a                                                                               |
+| headers left out    | -                                                                                                              |
++---------------------+----------------------------------------------------------------------------------------------------------------+
 
 $ php artisan onlyfans:rules --reload     # same release: only the page is read again
-| source              | webapp:https://onlyfans.com/                                                                            |
-| web app release     | 202611031453-fbc506331f                                                                                 |
-| rules (fingerprint) | 54d826cfd48b                                                                                            |
+| source              | webapp:https://onlyfans.com/                                                                                   |
+| web app release     | 202611061539-e69826e739                                                                                        |
+| rules (fingerprint) | 55a00e0a2497                                                                                                   |
 
 # storage/logs/refresh.log during this run:
-{"message":"onlyfans.webapp_rules_read","context":{"release":"202611031453-fbc506331f","signing_script":"2313.js","signing_module":"802313","ms":629},"level":200,"level_name":"INFO","channel":"local","datetime":"2026-11-04T04:02:37.849982+00:00","extra":{}}
-{"message":"onlyfans.rules_loaded","context":{"host":"onlyfans.com","rules_source":"webapp:https://onlyfans.com/","rules":"54d826cfd48b","release":"202611031453-fbc506331f","passed_over":[],"rejected_recently":false},"level":200,"level_name":"INFO","channel":"local","datetime":"2026-11-04T04:02:37.852372+00:00","extra":{}}
-{"message":"onlyfans.rules_loaded","context":{"host":"onlyfans.com","rules_source":"webapp:https://onlyfans.com/","rules":"54d826cfd48b","release":"202611031453-fbc506331f","passed_over":[],"rejected_recently":false},"level":200,"level_name":"INFO","channel":"local","datetime":"2026-11-04T04:02:38.857770+00:00","extra":{}}
+{"message":"onlyfans.webapp_rules_read","context":{"release":"202611061539-e69826e739","signing_script":"2313.js","signing_module":"802313","ms":625},"level":200,"level_name":"INFO","channel":"local","datetime":"2026-11-06T22:03:27.628981+00:00","extra":{}}
+{"message":"onlyfans.rules_loaded","context":{"host":"onlyfans.com","rules_source":"webapp:https://onlyfans.com/","rules":"55a00e0a2497","release":"202611061539-e69826e739","passed_over":[],"rejected_recently":false},"level":200,"level_name":"INFO","channel":"local","datetime":"2026-11-06T22:03:27.635825+00:00","extra":{}}
+{"message":"onlyfans.rules_loaded","context":{"host":"onlyfans.com","rules_source":"webapp:https://onlyfans.com/","rules":"55a00e0a2497","release":"202611061539-e69826e739","passed_over":[],"rejected_recently":false},"level":200,"level_name":"INFO","channel":"local","datetime":"2026-11-06T22:03:28.411060+00:00","extra":{}}
 
 # The public rule feeds right now (not used by default; opt-in via ONLYFANS_RULES_SOURCES), for comparison:
 https://raw.githubusercontent.com/rafa-9/dynamic-rules/main/rules.json
 "static_param":"UQe4c0nznfr5xt8EANtG9HyHmvMdqNRX" "prefix":"64937" "suffix":"6aa15875" "checksum_constant":728 
 https://raw.githubusercontent.com/DATAHOARDERS/dynamic-rules/main/onlyfans.json
-"static_param":"278ensloiFsow2rJMopwDWaMUiysP5fU" "format":"65232:{}:{:x}:6aa95d0a" "checksum_constant":-1085 
+"static_param":"nehRfpkUBy0hBRVbOl7zgrOtWTusMfjT" "format":"67747:{}:{:x}:6aecb145" "checksum_constant":974 
 https://raw.githubusercontent.com/datawhores/onlyfans-dynamic-rules/main/dynamicRules.json
 "static_param":"lZ9AAqh17MwkYNtMFJruP9IHybSQP8TG" "prefix":"26974" "suffix":"669fb034" "checksum_constant":-302 
 https://raw.githubusercontent.com/riley-access-labs/onlyfans-dynamic-rules-1/main/dynamicRules.json

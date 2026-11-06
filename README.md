@@ -94,7 +94,7 @@ refresh is pending. Only tested on Windows 11 with Docker Desktop.
 |---|---|
 | `docker compose exec app php artisan profiles:fetch madison420ivy [--queue]` | fetch from onlyfans.com now in this process, or hand it to Horizon |
 | `docker compose exec app php artisan onlyfans:rules [--reload]` | the signing rules in use, read from OnlyFans' web app (no API request) |
-| `docker compose exec app php artisan test` | 177 tests (Postgres and Redis of their own, never a real upstream) |
+| `docker compose exec app php artisan test` | 178 tests (Postgres and Redis of their own, never a real upstream) |
 | `docker compose exec -e REFRESH_HANDLER=legacy app php artisan test --group=incident` | the incident tests against the **old** handler: 6 of 7 fail |
 | `docker compose exec app php artisan workload:run --handler=legacy` / `--handler=v2` | the workload, before / after |
 | `docker compose exec app php artisan workload:run --rotate-rules=4` | the same, with the signing rules changing 4 s in |
@@ -475,12 +475,13 @@ JSON file and list it first in `ONLYFANS_RULES_SOURCES` (a public feed there wor
   `setup.sh`, the test suite, the rules read from OnlyFans' web app, the UI answering. It ran as a
   second stack next to the first, with the base URL on the fake upstream so that it made no API
   request to onlyfans.com.
-- **The rules extraction follows the obfuscator's current output shape**: a string table, the
-  rotation loop, wrapper functions, a helper object and the checksum as a sum of characters. It was
-  checked on one real release (`202611031453-fbc506331f`) and on synthetic code of the same shape
-  (rotations, wrappers, mixed operators), which runs in Node and signs as its rules say. A different
-  obfuscator configuration, or a digest other than SHA-1, fails loudly and needs the extractor
-  adjusted.
+- **The rules extraction follows the obfuscator's output shape**: a string table, the rotation
+  loop, wrapper functions, a helper object and the checksum as a sum of characters. It reads two
+  real releases, of 3 and 6 Nov, and synthetic code of both shapes, which runs in Node and signs as
+  its rules say. The 6 Nov release changed the shape in three small ways (statement order, argument
+  order, what follows the helper object). The extractor failed loudly on it, as designed, and was
+  adjusted the same day ([docs/signing.md](docs/signing.md)). The next such change will need the
+  same; until then the last good rules stay in use. A digest other than SHA-1 would fail loudly too.
 - **How long OnlyFans accepts an earlier release's rules is unknown.** On 4 Nov it accepted at least
   one earlier set.
 - **The revision of an OnlyFans answer is the local time the request was sent**, so workers on
@@ -542,7 +543,7 @@ app/Console/        profiles:fetch|enqueue-due|repair, onlyfans:rules,
                     workload:run|check|crash|throughput|scheduler-memory
 fake-upstream/      stand-in for OnlyFans' api2 (checks signatures, can rotate its rules) and Fans API
 resources/fixtures/ upstream response fixtures, incl. real madison420ivy responses, made-up signing rules
-tests/              177 PHPUnit tests; Support/SyntheticWebApp builds obfuscated signing code from
+tests/              178 PHPUnit tests; Support/SyntheticWebApp builds obfuscated signing code from
                     made-up rules (no OnlyFans code is in the repository)
 docs/               signing.md, scaling.md; evidence/ (tests, workload, crash, throughput, memory, clean setup, live fetches)
 ```

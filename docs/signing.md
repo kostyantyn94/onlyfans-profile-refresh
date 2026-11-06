@@ -77,6 +77,19 @@ unreadable code and is retried on the next load.
 - the rafa-9 feed's rules (an earlier release's) were also accepted;
 - two other feeds' rules were rejected.
 
+**A new release on 6 Nov** (`202611061539-e69826e739`). Its signing module is the same program,
+but the obfuscator's output differs in three ways:
+- in the rotation loop the wrapper comes after `const t=W()` instead of before it;
+- the checksum's wrapper takes the key first: `c("D83y",-385)`, not `t(160,"Xv(T")`;
+- the helper object is followed by more declarations (`,c=e()(...)`) before the signing function's
+  wrapper.
+
+The extractor refused it (`string array rotation not found`), as it should for any shape it does
+not know: nothing was guessed. It now accepts either statement order, reads calls with the key
+first or second, and cuts the helper object out by matching its brackets. Both releases give their
+rules. The 3 Nov release still gives exactly the rules above, and the 6 Nov one gives new ones
+(prefix `67795`, suffix `6aedf4bb`, constant −193; [16](evidence/16-webapp-rules.txt)).
+
 **Other sources** (`ONLYFANS_RULES_SOURCES`, tried in order) are opt-in: a local JSON file to pin
 rules by hand, or a public rule feed. Feeds publish three different shapes. All three are read and
 validated strictly (types, index range 0–39, hex app token).
@@ -87,8 +100,9 @@ No OnlyFans code is in the repository.
 [`SyntheticWebApp`](../tests/Support/SyntheticWebApp.php) builds a page, an `app.js` and an
 obfuscated signing module of the same shape from made-up rules. The module has:
 - RC4-encrypted strings in the custom base64;
-- an array rotated by 0, 1 or 17 positions;
-- wrappers that shift indexes, and helpers that mix operators.
+- an array rotated by 0, 1, 5 or 17 positions;
+- wrappers that shift indexes, and helpers that mix operators;
+- either the 3 Nov or the 6 Nov shape.
 
 [`WebAppRulesExtractorTest`](../tests/Unit/WebAppRulesExtractorTest.php) recovers the rules from it,
 and refuses variants it must not guess at.
@@ -99,14 +113,15 @@ runtime and checks that it signs a request exactly as its rules say:
 
 ```text
 $ docker compose exec -T app php tests/Support/synthetic-web-app-in-node.php | node tests/Support/synthetic-web-app-in-node.mjs
-rotation 0: signs as its rules say (13579:c504b2218add8d5d32fac405b3424fead78743bb:380:2468aceb)
-rotation 1: signs as its rules say (13579:9ea92e15e39b2af3332a86765a44f8963a3da9d5:379:2468aceb)
-rotation 17: signs as its rules say (13579:8bb73935e2fa94957d40fcb45dcac3ab09b3a933:38b:2468aceb)
+rotation 0: signs as its rules say (13579:dd465749cbd614564bc0444105ef79232112990e:1b3:2468aceb)
+rotation 1: signs as its rules say (13579:111ef65939a56eff7b6f19bc50c60229ee9bd9c2:30b:2468aceb)
+rotation 17: signs as its rules say (13579:e09f2171ed43df57ba113ec0783bf7c2685a205e:2d1:2468aceb)
+rotation 5, later shape: signs as its rules say (13579:4d547f7a8e4237db48d1578bc628df90d8ff585e:28c:2468aceb)
 ```
 
-The only check against the real code is the live one: the release above, read live
-([16](evidence/16-webapp-rules.txt)) and accepted by OnlyFans ([15](evidence/15-live-probes.txt),
-[14](evidence/14-live-onlyfans-fetch.txt)).
+The checks against the real code are the live ones: each release read live
+([16](evidence/16-webapp-rules.txt)) and its rules accepted by OnlyFans
+([15](evidence/15-live-probes.txt), [14](evidence/14-live-onlyfans-fetch.txt)).
 
 ## Sharing, reloading and rejecting rules
 

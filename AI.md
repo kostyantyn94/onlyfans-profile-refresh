@@ -183,6 +183,14 @@ confirmed and fixed with a test:
   - the `accounts.api_key` column keeps its name, although it now also holds an OnlyFans session
     credential.
 
+**A last readiness check (6 Nov)** found that OnlyFans had shipped a new release that day, and
+the extractor refused it: the obfuscator had changed the order of two statements, the order of a
+wrapper's arguments, and what follows the helper object. Nothing wrong was signed; refreshes would
+have kept the last good rules. A fresh setup, though, has no last good rules, so `profiles:fetch`
+would have failed. The extractor was adjusted to read both shapes, the synthetic web app learned the
+new one, and the live check was repeated on the new release
+([docs/signing.md](docs/signing.md#where-the-rules-come-from-onlyfans-own-web-app)).
+
 ## Not verified
 
 - That `favoritedCount` is the "likes" number OnlyFans shows on the profile page: it is the field
@@ -190,10 +198,9 @@ confirmed and fixed with a test:
 - How long a guest session stays valid, and how many requests OnlyFans allows per session or per
   IP before it throttles: only a handful of live requests were made. 429 and 5xx from OnlyFans were
   never seen live; their handling is tested against fakes.
-- That the rules extraction keeps working across OnlyFans releases. It has seen one real release
-  (`202611031453-fbc506331f`) and synthetic variants of the same obfuscated shape. A release built
-  with a different obfuscator configuration makes it fail loudly; the last good rules stay in use
-  until it is adjusted.
+- That the rules extraction keeps working across OnlyFans releases. It reads the releases of 3 and
+  6 Nov, and the second one already needed three small adjustments. The next change of shape will
+  make it fail loudly again; the last good rules stay in use until it is adjusted.
 - How long OnlyFans keeps accepting an earlier release's rules. On 4 Nov it accepted the rafa-9
   feed's, which differ from the current release's, and rejected two other feeds'.
 - The logged-in session mode (an account whose credential holds a browser session's user id,
