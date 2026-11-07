@@ -246,6 +246,33 @@ class SigningRulesProviderTest extends TestCase
         $loaded = collect($this->refreshLogLines())->firstWhere('message', 'onlyfans.rules_loaded');
         $this->assertSame(self::FIRST, $loaded['context']['rules_source']);
         $this->assertStringStartsWith('webapp:https://upstream.test/: ', $loaded['context']['passed_over'][0], 'why the web app was passed over');
+        $this->assertSame('WARNING', $loaded['level_name']);
+    }
+
+    public function test_the_rules_kept_in_the_repository_take_over_when_the_web_app_cannot_be_read(): void
+    {
+        // By default the web app is read first, then the rules OnlyFans last accepted.
+        $bundled = 'resources/onlyfans/last-accepted-rules.json';
+        // (Read from the file: TestCase replaces the sources with test ones.)
+        $defaults = (require base_path('config/services.php'))['onlyfans']['rules_sources'];
+        $this->assertSame(['webapp:https://onlyfans.com/', $bundled], $defaults['onlyfans.com']);
+
+        // A fresh setup (nothing cached) meets a release whose signing code changed shape.
+        $web = new SyntheticWebApp(self::WEB_RULES);
+        config(['services.onlyfans.rules_sources' => ['upstream.test' => ['webapp:https://upstream.test/', $bundled]]]);
+        Http::fake([
+            'upstream.test/' => Http::response($web->page()),
+            SyntheticWebApp::BASE.'app.js' => Http::response($web->app()),
+            SyntheticWebApp::BASE.'7777.js' => Http::response('/* 807777:function( something else */'),
+        ]);
+
+        $rules = $this->provider->for(self::BASE);
+
+        $saved = json_decode((string) file_get_contents(base_path($bundled)), true);
+        $this->assertSame([$bundled, $saved['release'], $saved['static_param']], [$rules->source, $rules->release, $rules->staticParam]);
+        $this->assertMatchesRegularExpression('/^\d{12}-[a-f0-9]{10}$/', (string) $rules->release, 'sent as x-of-rev, so a newer release is noticed');
+        $loaded = collect($this->refreshLogLines())->firstWhere('message', 'onlyfans.rules_loaded');
+        $this->assertSame(['WARNING', $bundled], [$loaded['level_name'], $loaded['context']['rules_source']]);
     }
 
     public function test_a_release_that_cannot_be_read_is_not_downloaded_again_on_every_reload(): void

@@ -44,10 +44,13 @@ return [
         // (WebAppRulesSource); a URL or a local JSON file gives them ready-made
         // (rules pinned by hand, or a public rule feed if you choose to trust
         // one). Rules that OnlyFans keeps rejecting are skipped (see
-        // SigningRulesProvider). By default only OnlyFans itself is asked.
+        // SigningRulesProvider). By default only OnlyFans itself is asked; the
+        // rules it last accepted, kept in the repository, are used when its
+        // code cannot be read (a release whose code changed shape) and nothing
+        // better is cached, e.g. on a fresh setup.
         'rules_sources' => [
             // An empty ONLYFANS_RULES_SOURCES= in .env means the default too.
-            'onlyfans.com' => array_values(array_filter(explode(',', (string) (env('ONLYFANS_RULES_SOURCES') ?: 'webapp:https://onlyfans.com/')))),
+            'onlyfans.com' => array_values(array_filter(explode(',', (string) (env('ONLYFANS_RULES_SOURCES') ?: 'webapp:https://onlyfans.com/,resources/onlyfans/last-accepted-rules.json')))),
             // The local fake upstream signs with its own test rules.
             parse_url((string) env('FAKE_UPSTREAM_URL', 'http://fake-upstream:8080'), PHP_URL_HOST) => [
                 rtrim((string) env('FAKE_UPSTREAM_URL', 'http://fake-upstream:8080'), '/').'/rules.json',

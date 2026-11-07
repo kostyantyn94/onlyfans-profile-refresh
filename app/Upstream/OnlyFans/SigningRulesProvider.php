@@ -308,7 +308,8 @@ class SigningRulesProvider
     /** @param  list<string>  $problems  earlier sources that gave nothing usable, and why */
     private function loaded(string $host, SigningRules $rules, array $problems): SigningRules
     {
-        Log::channel('refresh')->info('onlyfans.rules_loaded', [
+        // A warning when a source was passed over: someone should look at why.
+        Log::channel('refresh')->log($problems === [] ? 'info' : 'warning', 'onlyfans.rules_loaded', [
             'host' => $host,
             'rules_source' => $rules->source,
             'rules' => substr($rules->fingerprint(), 0, 12),

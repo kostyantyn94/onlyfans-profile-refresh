@@ -33,6 +33,8 @@
         <env name="FANSAPI_BASE_URL" value="https://upstream.test" force="true"/>
         <!-- Seeded OnlyFans accounts point here too; TestCase gives the host made-up signing rules. -->
         <env name="ONLYFANS_BASE_URL" value="https://upstream.test" force="true"/>
+        <!-- The default rules sources, whatever .env says. -->
+        <env name="ONLYFANS_RULES_SOURCES" value="" force="true"/>
         <!-- Not forced: REFRESH_HANDLER=legacy php artisan test runs the suite against the old handler. -->
         <env name="REFRESH_HANDLER" value="v2"/>
         <env name="DB_URL" value=""/>

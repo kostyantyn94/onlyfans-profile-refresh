@@ -1,0 +1,11 @@
+{
+  "release": "202611061539-e69826e739",
+  "static_param": "nCPoqEMsVhbBb9WC8VvanfVy0UcIaCS8",
+  "prefix": "67795",
+  "suffix": "6aedf4bb",
+  "checksum_indexes": [1, 2, 3, 3, 4, 6, 7, 7, 8, 10, 11, 11, 12, 13, 14, 16, 18, 19, 22, 23, 24, 30, 30, 32, 34, 34, 34, 35, 36, 37, 37, 39],
+  "checksum_constant": -193,
+  "app_token": "33d57ade8c02dbc5a333db99ff9ae26a",
+  "read_from": "OnlyFans' web app, release above (docs/evidence/16-webapp-rules.txt)",
+  "accepted_by_onlyfans": "2026-11-07T00:37Z (docs/evidence/14-live-onlyfans-fetch.txt)"
+}
