@@ -58,15 +58,6 @@ abstract class TestCase extends BaseTestCase
         ]);
     }
 
-    protected function makeFansApiAccount(array $attributes = []): Account
-    {
-        return $this->makeAccount([
-            'driver' => Account::DRIVER_FANSAPI,
-            'api_key' => 'secret-key-'.Str::random(12),
-            ...$attributes,
-        ]);
-    }
-
     /** The profile from the task: last valid likes 120,000 at revision 10. */
     protected function profileWithValidData(?Account $account = null, array $attributes = []): Profile
     {

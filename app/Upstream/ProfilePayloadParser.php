@@ -12,7 +12,6 @@ use Throwable;
  *
  * Accepted formats:
  *  - OnlyFans:  {"id": 5140520, "username": "...", "favoritedCount": 612018, ...} (api2/v2/users)
- *  - Fans API:  {"data": {..., "favoritedCount": 611905}, "_meta": {"_cache": {"cached_at": "..."}}}
  *  - old:       {"likes": 120000, "revision": 10, ...}
  *  - new:       {"profile": {"likes": 121000, ...}, "revision": 11}
  *
@@ -41,7 +40,7 @@ class ProfilePayloadParser
 
     /**
      * @param  int  $fallbackRevision  the time the request was sent (ms): the revision of an
-     *                                 OnlyFans response, or of a Fans API one without a cache timestamp
+     *                                 OnlyFans response
      */
     public function parse(string $body, int $fallbackRevision): ProfileSnapshot
     {
@@ -64,7 +63,6 @@ class ProfilePayloadParser
         }
 
         return match (true) {
-            array_key_exists('data', $json) => $this->fromFansApi($json, $fallbackRevision),
             $this->isOnlyFansUser($json) => $this->fromOnlyFans($json, $fallbackRevision),
             default => $this->fromRevisioned($json),
         };
@@ -91,39 +89,6 @@ class ProfilePayloadParser
         return array_key_exists('favoritedCount', $json)
             || (array_key_exists('id', $json) && array_key_exists('username', $json)
                 && ! array_key_exists('likes', $json) && ! array_key_exists('profile', $json) && ! array_key_exists('revision', $json));
-    }
-
-    private function fromFansApi(array $json, int $fallbackRevision): ProfileSnapshot
-    {
-        $data = $json['data'];
-
-        if (! $this->isObject($data)) {
-            throw new InvalidProfilePayload('data is not an object');
-        }
-
-        if (! array_key_exists('favoritedCount', $data)) {
-            throw new InvalidProfilePayload('data.favoritedCount (likes) is missing');
-        }
-
-        $likes = $this->wholeNumber($data['favoritedCount'], 'data.favoritedCount');
-
-        // Fans API has no revision. The time Fans API took the snapshot from
-        // OnlyFans grows with every new snapshot, so it orders responses the
-        // same way; without it, fall back to when we sent the request.
-        $cache = $json['_meta']['_cache'] ?? null;
-        $cachedAtMs = $this->cachedAt($cache);
-        $revision = $cachedAtMs ?? $fallbackRevision;
-
-        // The snapshot's age is judged by cached_at, whatever is_cached says: an
-        // answer marked live but taken hours ago is still old. A cached answer
-        // without a usable cached_at is of unknown age: treated as too old.
-        $cachedAt = match (true) {
-            $cachedAtMs !== null => CarbonImmutable::createFromTimestampMs($cachedAtMs),
-            is_array($cache) && ($cache['is_cached'] ?? false) === true => CarbonImmutable::createFromTimestampMs(0),
-            default => null,
-        };
-
-        return new ProfileSnapshot($likes, $revision, 'fansapi', $this->attributes($data), $data, $cachedAt);
     }
 
     private function fromRevisioned(array $json): ProfileSnapshot
@@ -177,22 +142,6 @@ class ProfilePayloadParser
         }
 
         return $number;
-    }
-
-    private function cachedAt(mixed $cache): ?int
-    {
-        if (! is_array($cache) || ! is_string($cache['cached_at'] ?? null) || trim($cache['cached_at']) === '') {
-            return null;
-        }
-
-        try {
-            $cachedAt = CarbonImmutable::parse($cache['cached_at']);
-        } catch (Throwable) {
-            return null;
-        }
-
-        // A time in the future is not a time the snapshot was taken.
-        return $cachedAt->gt(CarbonImmutable::now()->addMinutes(5)) ? null : (int) $cachedAt->getTimestampMs();
     }
 
     /**

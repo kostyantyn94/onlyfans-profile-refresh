@@ -8,7 +8,6 @@
  *   GET /{account}/api2/v2/users/{username}  OnlyFans api2, signed like the real one
  *   GET /rules.json                          the signing rules in force (rules.json,
  *                                            or rules-rotated.json after a rotation)
- *   GET /api/profiles/{username}             Fans API, Bearer key (driver "fansapi")
  *
  * A signed request must carry app-token, time, x-bc and a sign that matches the
  * rules in force; otherwise it gets OnlyFans' answer to a bad signature: HTTP
@@ -20,8 +19,8 @@
  * the workload command (key fake-upstream:scenario:{account}):
  *
  *   format       "old" (top-level likes), "new" (profile.likes), "mixed"
- *                (alternates old/new, like a partial upstream rollout), "onlyfans"
- *                (the api2 user object) or "fansapi"
+ *                (alternates old/new, like a partial upstream rollout) or "onlyfans"
+ *                (the api2 user object)
  *   likes        likes to report (default 121000)
  *   revision     revision to report (default 11)
  *   latency_ms   added to every request
@@ -116,17 +115,6 @@ if (preg_match('#^/([a-z0-9_-]{1,32})/api2/v2/users/([A-Za-z0-9_.-]{1,64})$#', $
         $redis->sAdd("fake-upstream:secrets:{$account}", $sess);
         header('Set-Cookie: sess='.$sess.'; Max-Age=864000; path=/; HttpOnly', false);
     }
-} elseif (preg_match('#^/api/profiles/([A-Za-z0-9_.-]{1,64})$#', $path, $match)) {
-    $username = $match[1];
-
-    // Accounts are recognised by the hash of their bearer token; the token itself
-    // is never stored here.
-    $token = preg_replace('/^Bearer\s+/i', '', $_SERVER['HTTP_AUTHORIZATION'] ?? '');
-    $account = $token === '' ? false : $redis->hGet('fake-upstream:tokens', hash('sha256', $token));
-
-    if ($account === false) {
-        respond($redis, null, 401, ['error' => 'Unauthenticated']);
-    }
 } else {
     respond($redis, null, 404, ['error' => 'Not Found']);
 }
@@ -169,6 +157,5 @@ if ($format === 'mixed') {
 respond($redis, $account, 200, match ($format) {
     'old' => [...$profile, 'likes' => $likes, 'revision' => $revision],
     'onlyfans' => ['id' => crc32($username), ...$profile, 'favoritedCount' => $likes],
-    'fansapi' => ['data' => [...$profile, 'favoritedCount' => $likes], '_meta' => ['_cache' => ['is_cached' => false, 'cached_at' => gmdate('c')]]],
     default => ['profile' => [...$profile, 'likes' => $likes], 'revision' => $revision],
 });

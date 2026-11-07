@@ -11,8 +11,7 @@ class UpstreamClients
     public function for(Account $account): ProfileClient
     {
         return match ($account->driver) {
-            Account::DRIVER_FANSAPI => app(FansApiClient::class),
-            default => app(OnlyFansClient::class),
+            Account::DRIVER_ONLYFANS => app(OnlyFansClient::class),
         };
     }
 }

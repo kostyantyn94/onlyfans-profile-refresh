@@ -28,9 +28,6 @@
         <!-- Redis databases of their own: tests flush them, Horizon uses 0 and 1. -->
         <env name="REDIS_DB" value="14" force="true"/>
         <env name="REDIS_CACHE_DB" value="15" force="true"/>
-        <!-- Never the real key; Http::preventStrayRequests() blocks real calls anyway. -->
-        <env name="FANSAPI_KEY" value="test-key-0000" force="true"/>
-        <env name="FANSAPI_BASE_URL" value="https://upstream.test" force="true"/>
         <!-- Seeded OnlyFans accounts point here too; TestCase gives the host made-up signing rules. -->
         <env name="ONLYFANS_BASE_URL" value="https://upstream.test" force="true"/>
         <!-- The default rules sources, whatever .env says. -->

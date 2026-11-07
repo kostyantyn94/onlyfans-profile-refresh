@@ -18,12 +18,5 @@ class DatabaseSeeder extends Seeder
         );
 
         Profile::query()->createOrFirst(['account_id' => $onlyFans->id, 'username' => 'madison420ivy']);
-
-        // The managed Fans API endpoint, for comparison (profiles:fetch --account=fansapi).
-        // api_key stays null: the key is read from FANSAPI_KEY at request time.
-        Account::query()->updateOrCreate(
-            ['slug' => 'fansapi'],
-            ['name' => 'Fans API', 'driver' => Account::DRIVER_FANSAPI, 'base_url' => config('services.fansapi.base_url'), 'api_key' => null],
-        );
     }
 }

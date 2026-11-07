@@ -4,7 +4,6 @@ namespace Tests\Unit;
 
 use App\Upstream\InvalidProfilePayload;
 use App\Upstream\ProfilePayloadParser;
-use Carbon\CarbonImmutable;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -17,14 +16,15 @@ class ProfilePayloadParserTest extends TestCase
         return (new ProfilePayloadParser)->parse($body, self::FALLBACK_REVISION);
     }
 
-    public function test_real_fans_api_response_for_madison420ivy(): void
+    public function test_real_onlyfans_response_for_madison420ivy(): void
     {
-        $snapshot = $this->parse($this->fixture('fansapi-madison420ivy.json'));
+        $body = $this->fixture('onlyfans-madison420ivy.json');
+        $snapshot = $this->parse($body);
 
-        $this->assertSame('fansapi', $snapshot->format);
-        $this->assertSame(611_905, $snapshot->likes, 'likes come from data.favoritedCount');
-        // Fans API has no revision; the snapshot time (_meta._cache.cached_at) orders responses.
-        $this->assertSame(CarbonImmutable::parse('2026-11-01T08:12:09+00:00')->getTimestampMs(), $snapshot->revision);
+        $this->assertSame('onlyfans', $snapshot->format);
+        $this->assertSame(json_decode($body, true)['favoritedCount'], $snapshot->likes, 'likes come from favoritedCount');
+        // OnlyFans has no revision: the time the request was sent orders responses.
+        $this->assertSame(self::FALLBACK_REVISION, $snapshot->revision);
         $this->assertSame(5_140_520, $snapshot->attributes['upstream_id']);
         $this->assertSame('Madison Ivy', $snapshot->attributes['name']);
         $this->assertSame(178, $snapshot->attributes['posts_count']);
@@ -35,20 +35,6 @@ class ProfilePayloadParserTest extends TestCase
         $this->assertSame(0.0, $snapshot->attributes['subscribe_price']);
         $this->assertSame('2018-11-11', $snapshot->attributes['joined_at']->toDateString());
         $this->assertStringStartsWith('https://public.onlyfans.com/', $snapshot->attributes['avatar_url']);
-        $this->assertCount(87, $snapshot->raw, 'the whole profile object is kept');
-    }
-
-    public function test_real_onlyfans_response_for_madison420ivy(): void
-    {
-        $body = $this->fixture('onlyfans-madison420ivy.json');
-        $snapshot = $this->parse($body);
-
-        $this->assertSame('onlyfans', $snapshot->format);
-        $this->assertSame(json_decode($body, true)['favoritedCount'], $snapshot->likes, 'likes come from favoritedCount');
-        // OnlyFans has no revision: the time the request was sent orders responses.
-        $this->assertSame(self::FALLBACK_REVISION, $snapshot->revision);
-        $this->assertNull($snapshot->cachedAt);
-        $this->assertSame(5_140_520, $snapshot->attributes['upstream_id']);
         $this->assertSame('madison420ivy', $snapshot->raw['username']);
         $this->assertCount(count(json_decode($body, true)), $snapshot->raw, 'the whole user object is kept');
     }
@@ -58,20 +44,6 @@ class ProfilePayloadParserTest extends TestCase
         $this->expectExceptionObject(new InvalidProfilePayload('favoritedCount (likes) is missing'));
 
         $this->parse(json_encode(['id' => 1, 'username' => 'x', 'name' => 'X']));
-    }
-
-    public function test_fans_api_response_without_cache_timestamp_uses_the_request_time(): void
-    {
-        $snapshot = $this->parse(json_encode(['data' => ['favoritedCount' => 5], '_meta' => ['_cache' => ['is_cached' => false]]]));
-
-        $this->assertSame(self::FALLBACK_REVISION, $snapshot->revision);
-    }
-
-    public function test_fans_api_response_without_favorited_count_is_invalid(): void
-    {
-        $this->expectExceptionObject(new InvalidProfilePayload('data.favoritedCount (likes) is missing'));
-
-        $this->parse(json_encode(['data' => ['username' => 'x']]));
     }
 
     public function test_old_format(): void

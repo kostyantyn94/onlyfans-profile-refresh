@@ -32,7 +32,7 @@ class RunWorkload extends Command
         {--storm=6 : Seconds during which every busy request gets 429 (no Retry-After)}
         {--busy-per-second=5 : Busy account limit after the storm}
         {--error-every=10 : Every Nth busy request gets HTTP 500 with an empty body (0 = never)}
-        {--format=mixed : Upstream format: old, new, mixed (alternating) or fansapi}
+        {--format=mixed : Upstream format: old, new, mixed (alternating) or onlyfans}
         {--latency=50 : Milliseconds added to every upstream response}
         {--rotate-rules=0 : Seconds after the start when the fake upstream switches to new signing rules (0 = never)}
         {--timeout=180 : Stop waiting after this many seconds}';

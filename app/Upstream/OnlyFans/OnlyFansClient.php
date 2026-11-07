@@ -24,8 +24,7 @@ class OnlyFansClient implements ProfileClient
         private SessionStore $sessions,
     ) {}
 
-    /** OnlyFans always answers with live data, so $fresh changes nothing here. */
-    public function fetchProfile(Account $account, string $username, bool $fresh = false, ?Closure $beforeSend = null): UpstreamResponse
+    public function fetchProfile(Account $account, string $username, ?Closure $beforeSend = null): UpstreamResponse
     {
         $rules = $this->rules->for($account->base_url);
         $session = $this->sessions->for($account);

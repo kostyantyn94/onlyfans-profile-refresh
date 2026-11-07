@@ -2,8 +2,6 @@
 
 namespace App\Upstream;
 
-use Carbon\CarbonImmutable;
-
 /** A validated profile from one upstream response. */
 final readonly class ProfileSnapshot
 {
@@ -17,7 +15,5 @@ final readonly class ProfileSnapshot
         public string $format,
         public array $attributes,
         public array $raw,
-        // Fans API only: when the snapshot was taken (its _meta._cache.cached_at).
-        public ?CarbonImmutable $cachedAt = null,
     ) {}
 }

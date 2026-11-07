@@ -61,47 +61,13 @@ class ProfileRefresher
             return;
         }
 
-        $fresh = (bool) config('services.fansapi.fresh');
+        $result = $this->fetchValid($job, $profile, $attempt, $context);
 
-        // Every response goes through the same checks, the follow-up included;
-        // the loop runs at most twice (cache first, then live data once).
-        while (true) {
-            $result = $this->fetchValid($job, $profile, $attempt, $context, $fresh);
-
-            if ($result === null) {
-                return;
-            }
-
-            [$response, $snapshot, $row] = $result;
-
-            if (! $this->cacheTooOld($snapshot)) {
-                break;
-            }
-
-            $reason = 'snapshot cached at '.$snapshot->cachedAt->toIso8601String().' is older than '
-                .config('services.fansapi.max_cache_age_minutes').' min';
-
-            if ($fresh) {
-                $this->failed($job, $profile, $row, $attempt, Outcome::CacheStillTooOld, $reason.' even with ?fresh=true', $response, $context);
-
-                return;
-            }
-
-            if ($attempt >= $this->attemptBudget()) {
-                // No attempt left for the live request: a failed refresh, never a stale success.
-                $this->failed($job, $profile, $row, $attempt, Outcome::CacheTooOld, $reason.'; no attempt left to ask for live data', $response, $context);
-
-                return;
-            }
-
-            // Fans API answered from a cached snapshot older than we accept: that
-            // is not a refresh. Record it and ask once more for live data.
-            $this->finishAttempt($row, Outcome::CacheTooOld, $response, revision: $snapshot->revision, likes: $snapshot->likes);
-            Log::channel('refresh')->info('refresh.cache_too_old', [...$context, 'cached_at' => $snapshot->cachedAt->toIso8601String()]);
-
-            $context['upstream_attempt'] = ++$attempt;
-            $fresh = true;
+        if ($result === null) {
+            return;
         }
+
+        [$response, $snapshot, $row] = $result;
 
         $this->crashForTest($job, 'before-write', $context);
 
@@ -134,12 +100,12 @@ class ProfileRefresher
      *
      * @return array{0: UpstreamResponse, 1: ProfileSnapshot, 2: RefreshAttempt}|null
      */
-    private function fetchValid(RefreshProfile $job, Profile $profile, int $attempt, array $context, bool $fresh): ?array
+    private function fetchValid(RefreshProfile $job, Profile $profile, int $attempt, array $context): ?array
     {
         $row = null;
 
         try {
-            $response = $this->clients->for($profile->account)->fetchProfile($profile->account, $profile->username, $fresh,
+            $response = $this->clients->for($profile->account)->fetchProfile($profile->account, $profile->username,
                 // The attempt is recorded right before the request goes out, in its own
                 // commit, so the budget counts every request sent: also one whose worker
                 // dies before the answer is stored (it stays "in_flight", and a
@@ -203,8 +169,8 @@ class ProfileRefresher
      */
     private function assertSameProfile(Profile $profile, ProfileSnapshot $snapshot): void
     {
-        // Only the real upstream formats carry an identity; the incident's test formats do not.
-        if (! in_array($snapshot->format, ['onlyfans', 'fansapi'], true)) {
+        // Only OnlyFans' format carries an identity; the incident's test formats do not.
+        if ($snapshot->format !== 'onlyfans') {
             return;
         }
 
@@ -221,13 +187,7 @@ class ProfileRefresher
         }
     }
 
-    private function cacheTooOld(ProfileSnapshot $snapshot): bool
-    {
-        return $snapshot->cachedAt !== null
-            && $snapshot->cachedAt->lt(CarbonImmutable::now()->subMinutes((int) config('services.fansapi.max_cache_age_minutes')));
-    }
-
-    /** Upstream calls allowed per refresh, follow-ups included. */
+    /** Upstream calls allowed per refresh. */
     private function attemptBudget(): int
     {
         return (int) config('refresh.max_upstream_attempts');

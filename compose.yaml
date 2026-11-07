@@ -40,8 +40,8 @@ services:
     <<: *php
     command: php artisan schedule:work
 
-  # Stand-in for OnlyFans' api2 (checks signatures like it) and for Fans API, driven by
-  # the workload and the crash test (fake-upstream/server.php).
+  # Stand-in for OnlyFans' api2 (checks signatures like it), driven by the workload
+  # and the crash test (fake-upstream/server.php).
   fake-upstream:
     image: serversideup/php:8.4-cli-alpine-v5.0.5
     working_dir: /srv

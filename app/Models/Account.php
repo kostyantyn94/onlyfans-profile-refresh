@@ -6,19 +6,16 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * One upstream identity (an OnlyFans session, or a Fans API key). Upstream rate
- * limits apply per account, so cooldowns and concurrency limits are keyed by it.
+ * One upstream identity: an OnlyFans session. Upstream rate limits apply per
+ * account, so cooldowns and concurrency limits are keyed by it.
  *
  * driver "onlyfans": signed requests to base_url/api2/v2 (OnlyFansClient). A
  * null api_key means a guest session; for a logged-in session it holds JSON
  * {"user_id", "cookie", "x_bc", "user_agent"} copied from that browser session.
- * driver "fansapi": base_url/api/profiles with api_key as the bearer key.
  */
 class Account extends Model
 {
     public const DRIVER_ONLYFANS = 'onlyfans';
-
-    public const DRIVER_FANSAPI = 'fansapi';
 
     protected $fillable = ['slug', 'name', 'driver', 'base_url', 'api_key', 'max_concurrency'];
 
@@ -37,12 +34,6 @@ class Account extends Model
     public function profiles(): HasMany
     {
         return $this->hasMany(Profile::class);
-    }
-
-    /** The Fans API key to send upstream; null in the database means "use FANSAPI_KEY". */
-    public function credential(): ?string
-    {
-        return $this->api_key ?? config('services.fansapi.key');
     }
 
     /**

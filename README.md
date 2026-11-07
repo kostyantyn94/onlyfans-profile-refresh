@@ -65,22 +65,23 @@ Checked live:
 [Before and after](#before-and-after) · [Worker crash](#worker-crash) ·
 [Observability](#observability) · [Scaling](#the-next-scaling-limit) ·
 [Production plan](#production-plan) · [Limits](#remaining-limits) · [Time spent](#time-spent) ·
-[Appendix](#appendix-the-fans-api-driver-and-the-public-demo)
+[Appendix](#appendix-the-public-demo)
 
 ## Changes after the review
 
 | Review finding | Change | Tests / evidence |
 |---|---|---|
-| The integration called the managed Fans API endpoint instead of OnlyFans | The default driver signs its requests to `onlyfans.com/api2/v2/users/{username}` itself, as above. The Fans API client stays as the `fansapi` driver, for comparison only ([appendix](#appendix-the-fans-api-driver-and-the-public-demo)). | [`OnlyFansClientTest`](tests/Feature/OnlyFansClientTest.php), [`RequestSignerTest`](tests/Unit/RequestSignerTest.php), [`WebAppRulesExtractorTest`](tests/Unit/WebAppRulesExtractorTest.php); live: [14](docs/evidence/14-live-onlyfans-fetch.txt), [15](docs/evidence/15-live-probes.txt), [16](docs/evidence/16-webapp-rules.txt); rules rotation: [13](docs/evidence/13-workload-rules-rotation.txt) |
-| The response to the forced-fresh request was not checked for stale data (Fans API driver) | Every response goes through the same checks. If `?fresh=true` still returns an old snapshot, it is not stored: `cache_still_too_old`, retried with backoff. | [12](docs/evidence/12-review-fixes-tests.txt) |
-| That extra request could exceed the ten-attempt limit (budget: both drivers) | The budget is checked before every call, and each attempt is recorded right before its request goes out, in its own commit. A follow-up that would be the 11th is not sent, and a redelivered job with no attempts left sends nothing. A call whose worker died before storing the answer still counts (`in_flight`). | [12](docs/evidence/12-review-fixes-tests.txt), [`RealWorkerTest`](tests/Feature/RealWorkerTest.php), [06](docs/evidence/06-crash-before-write.txt) |
-| The profile update and the attempt record were committed separately (both drivers) | The profile write and its attempt's result commit in one transaction, on success and on failure: a crash leaves both or neither. | [12](docs/evidence/12-review-fixes-tests.txt) |
+| The integration called the managed Fans API endpoint instead of OnlyFans | Requests are signed and sent to `onlyfans.com/api2/v2/users/{username}` directly, as above. The Fans API client is removed, with its settings and its seeded account (a migration deletes that account from existing databases). | [`OnlyFansClientTest`](tests/Feature/OnlyFansClientTest.php), [`RequestSignerTest`](tests/Unit/RequestSignerTest.php), [`WebAppRulesExtractorTest`](tests/Unit/WebAppRulesExtractorTest.php); live: [14](docs/evidence/14-live-onlyfans-fetch.txt), [15](docs/evidence/15-live-probes.txt), [16](docs/evidence/16-webapp-rules.txt); rules rotation: [13](docs/evidence/13-workload-rules-rotation.txt) |
+| The response to the forced-fresh request was not checked for stale data (Fans API cache) | Fixed first in the Fans API client: an old snapshot after `?fresh=true` was not stored ([12](docs/evidence/12-review-fixes-tests.txt), commit `a6d086d`). That client is now removed, with its cache and its `?fresh=true` follow-up: OnlyFans answers with live data, and every response goes through the same checks. | [12](docs/evidence/12-review-fixes-tests.txt) |
+| That extra request could exceed the ten-attempt limit | The budget is checked before every call, and each attempt is recorded right before its request goes out, in its own commit. A redelivered job with no attempts left sends nothing, and a call whose worker died before storing the answer still counts (`in_flight`). The extra request itself went with the Fans API client: one request per attempt. | [12](docs/evidence/12-review-fixes-tests.txt), [`RealWorkerTest`](tests/Feature/RealWorkerTest.php), [06](docs/evidence/06-crash-before-write.txt) |
+| The profile update and the attempt record were committed separately | The profile write and its attempt's result commit in one transaction, on success and on failure: a crash leaves both or neither. | [12](docs/evidence/12-review-fixes-tests.txt) |
 
-The stale-response and extra-request findings are about the Fans API driver's cache (`?fresh=true`).
-OnlyFans' api2 has no cache, so on the default driver every request is one attempt with live data. The attempt budget and
-the transaction apply to both drivers. All four regression tests for the three findings fail on the
-reviewed code (recorded with the fix stashed) and pass now. Two older tests had only passed because
-of the first finding; see [AI.md](AI.md).
+The stale-response and extra-request findings were about the Fans API cache (`?fresh=true`).
+OnlyFans' api2 has no cache, so every request is one attempt with live data. All four regression
+tests for the three findings failed on the reviewed code (recorded with the fix stashed) and passed
+with the fix ([12](docs/evidence/12-review-fixes-tests.txt)); the two about `?fresh=true` went with
+the Fans API client, the other two still run. Two older tests had only passed because of the first
+finding; see [AI.md](AI.md).
 
 **The incident, same workload before and after** ([details](#before-and-after)):
 
@@ -115,7 +116,7 @@ refresh is pending. Only tested on Windows 11 with Docker Desktop.
 |---|---|
 | `docker compose exec app php artisan profiles:fetch madison420ivy [--queue]` | fetch from onlyfans.com now in this process, or hand it to Horizon |
 | `docker compose exec app php artisan onlyfans:rules [--reload]` | the signing rules in use, read from OnlyFans' web app (no API request) |
-| `docker compose exec app php artisan test` | 179 tests (Postgres and Redis of their own, never a real upstream) |
+| `docker compose exec app php artisan test` | 167 tests (Postgres and Redis of their own, never a real upstream) |
 | `docker compose exec -e REFRESH_HANDLER=legacy app php artisan test --group=incident` | the incident tests against the **old** handler: 6 of 7 fail |
 | `docker compose exec app php artisan workload:run --handler=legacy` / `--handler=v2` | the workload, before / after |
 | `docker compose exec app php artisan workload:run --rotate-rules=4` | the same, with the signing rules changing 4 s in |
@@ -202,13 +203,11 @@ behind the burst (*oldest jobs keep getting older, one busy account delays the o
 fetch, validate, then write or classify the failure.
 
 - **Validate every response before writing** ([`ProfilePayloadParser`](app/Upstream/ProfilePayloadParser.php)).
-  Accepts OnlyFans' user object, the Fans API format, the old top-level `likes` and the new
-  `profile.likes`. Likes must be present and a whole number ≥ 0: explicit 0 is valid; missing,
+  Accepts OnlyFans' user object, the old top-level `likes` and the new `profile.likes`. Likes must be present and a whole number ≥ 0: explicit 0 is valid; missing,
   negative, `"121k"`, `1.5`, `true`, `null` are not; different values in both places are a conflict.
   The incident formats need a revision. Optional fields with a wrong type or a value that would not
-  fit the column are skipped and keep their stored value. A follow-up response (Fans API's
-  `?fresh=true`) passes the same checks as the first.
-- **The answer must be the profile asked for.** An OnlyFans or Fans API answer for another username,
+  fit the column are skipped and keep their stored value.
+- **The answer must be the profile asked for.** An OnlyFans answer for another username,
   or with another upstream id than the one stored (the username now belongs to someone else), is
   `invalid_response` and writes nothing.
 - **Only a newer revision writes** ([`ProfileStore`](app/Refresh/ProfileStore.php)): one statement,
@@ -238,8 +237,7 @@ fetch, validate, then write or classify the failure.
 
 ## Keep the queue moving
 
-Each job run is **one upstream attempt** (Fans API's `?fresh=true` follow-up is a second attempt in
-the same run). A retry is a `release()` with a delay, never a sleep in the job, so a waiting refresh
+Each job run is **one upstream attempt**. A retry is a `release()` with a delay, never a sleep in the job, so a waiting refresh
 holds no worker.
 
 | Upstream result | Outcome | What happens | Tries per refresh |
@@ -250,10 +248,9 @@ holds no worker.
 | 400 "Please refresh the page" | `signature_rejected` | rules marked for reload, guest session renewed, retried with backoff from 5 s | 3 |
 | no source has valid signing rules (and none are cached) | `rules_unavailable` | nothing sent; retried from 60 s | 3 |
 | another worker is loading the rules | (deferred) | nothing sent, no attempt spent; tried again in 3 s | – |
-| Fans API: old snapshot even with `?fresh=true` | `cache_still_too_old` | not stored; retried from 30 s | 3 |
 | 404, 410 / 401, 403 / other 4xx / invalid body | `not_found` / `auth_failed` / `client_error` / `invalid_response` | fails at once, data kept | 1 |
 
-**At most 10 upstream attempts per refresh, checked before every request**, follow-ups included.
+**At most 10 upstream attempts per refresh, checked before every request**.
 Each attempt row is written before its request is sent, in its own commit, and completed with the
 result: a call whose worker dies before storing the answer stays `in_flight` and still counts, so
 the limit holds even across crashes. "Randomised" is equal jitter: half the delay fixed, half random,
@@ -380,7 +377,7 @@ Every refresh event is one JSON line in `storage/logs/refresh.log` with `refresh
 and `account_id`; the lines of an attempt add `account`, `username`, `job_id`, `job_attempt`,
 `upstream_attempt`, `outcome`, `http_status`, `retry_in_seconds`, `duration_ms` (and `format`,
 `revision`, `likes`, `memory_peak_mb` on success). Events: `queued`, `deferred` (debug), `retry_scheduled`,
-`cache_too_old`, `success` / `unchanged` / `stale_ignored`, `failed`, `gave_up`, `skipped_not_pending`;
+`success` / `unchanged` / `stale_ignored`, `failed`, `gave_up`, `skipped_not_pending`;
 for signing:
 - `onlyfans.rules_loaded`: the source, the release and the sources passed over, with the reason;
 - `onlyfans.webapp_rules_read`: the release, the script and the time taken;
@@ -414,8 +411,7 @@ sent; `in_flight` if its worker died before the answer was stored) and on the pr
 Horizon jobs are tagged `profile:`, `account:`, `refresh:`, and Horizon raises `LongWaitDetected`
 when the refresh queue waits over 60 s (no notification channel is configured in this project).
 **Secrets:** session cookies and `x-bc` live only in the encrypted cache entry and the request
-headers; a logged-in credential and the Fans API key are encrypted at rest (or read from
-`FANSAPI_KEY`); no header is logged and connection errors are scrubbed. Tests check the logs and the
+headers; a logged-in credential is encrypted at rest; no header is logged and connection errors are scrubbed. Tests check the logs and the
 raw cache for cookie values and `x-bc`, and every workload run checks the logs for the accounts'
 session tokens: 0 found.
 
@@ -560,7 +556,7 @@ Claude Code working as an agent; see [AI.md](AI.md).
 ```
 app/Upstream/       ProfileClient; OnlyFans/ (OnlyFansClient, RequestSigner, SigningRules,
                     SigningRulesProvider, WebAppRulesSource, WebAppRulesExtractor, JsExpression,
-                    Session, SessionStore); FansApiClient; UpstreamClients
+                    Session, SessionStore); UpstreamClients
                     (driver → client); ProfilePayloadParser (validation), ProfileSnapshot
 app/Refresh/        ProfileRefresher (one attempt), ProfileStore (all writes), RefreshScheduler (claims),
                     Outcome, RefreshPolicy (24 h / 72 h), Backoff, AccountThrottle (cooldowns)
@@ -568,24 +564,17 @@ app/Jobs/           RefreshProfile (fixed), LegacyRefreshProfile (incident),
                     Middleware/SkipUnclaimedRefresh, Middleware/AccountGate
 app/Console/        profiles:fetch|enqueue-due|repair, onlyfans:rules,
                     workload:run|check|crash|throughput|scheduler-memory
-fake-upstream/      stand-in for OnlyFans' api2 (checks signatures, can rotate its rules) and Fans API
+fake-upstream/      stand-in for OnlyFans' api2 (checks signatures, can rotate its rules)
 resources/fixtures/ upstream response fixtures, incl. real madison420ivy responses, made-up signing rules
 resources/onlyfans/ the signing rules OnlyFans last accepted: the last default source
-tests/              179 PHPUnit tests; Support/SyntheticWebApp builds obfuscated signing code from
+tests/              167 PHPUnit tests; Support/SyntheticWebApp builds obfuscated signing code from
                     made-up rules (no OnlyFans code is in the repository)
 docs/               signing.md, scaling.md; evidence/ (tests, workload, crash, throughput, memory, clean setup, live fetches)
 ```
 
-## Appendix: the Fans API driver and the public demo
+## Appendix: the public demo
 
-**Fans API** (driver `fansapi`, the seeded `fansapi` account) is kept for comparison only. The first
-version used its `GET /api/profiles/{username}`, which returns the same user object under `data`
-plus a cache timestamp. A cached snapshot older than 60 min (`FANSAPI_MAX_CACHE_AGE_MINUTES`), or
-one of unknown age, is not a refresh: the job records `cache_too_old` and asks once more with
-`?fresh=true` ([11](docs/evidence/11-live-fresh-fetch.txt), first version). It needs `FANSAPI_KEY` in
-`.env`: `docker compose exec app php artisan profiles:fetch madison420ivy --account=fansapi`.
-
-**Public demo:** with `PUBLIC_READ_ONLY=true` and `PUBLIC_URL` set, requests that arrive through a
+With `PUBLIC_READ_ONLY=true` and `PUBLIC_URL` set, requests that arrive through a
 reverse proxy on the same machine (they carry `X-Forwarded-For`, e.g. via Tailscale Funnel) can only
 read: no tracking, no "refresh now", no Horizon dashboard
 ([`PublicDemo`](app/Http/Middleware/PublicDemo.php)). The app's port is published on 127.0.0.1

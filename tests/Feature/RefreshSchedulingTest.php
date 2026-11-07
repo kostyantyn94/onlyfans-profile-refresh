@@ -6,7 +6,6 @@ use App\Jobs\LegacyRefreshProfile;
 use App\Jobs\RefreshProfile;
 use App\Models\Profile;
 use App\Refresh\RefreshScheduler;
-use Carbon\CarbonImmutable;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
@@ -112,21 +111,5 @@ class RefreshSchedulingTest extends TestCase
 
         $this->assertSame(1, Profile::query()->count(), 'the seeded profile is reused, not duplicated');
         $this->assertSame(json_decode($this->fixture('onlyfans-madison420ivy.json'), true)['favoritedCount'], Profile::query()->sole()->likes_count);
-    }
-
-    public function test_the_fetch_command_can_use_the_fans_api_account(): void
-    {
-        // Shortly after the fixture was cached by Fans API (08:12:09 UTC), so
-        // the cached answer is recent enough to be a refresh.
-        $this->travelTo(CarbonImmutable::parse('2026-11-01 08:30:00 UTC'));
-        $this->seed();
-        config(['refresh.handler' => 'v2']);
-        Http::fake(['upstream.test/api/profiles/*' => Http::response($this->fixture('fansapi-madison420ivy.json'))]);
-
-        $this->artisan('profiles:fetch', ['username' => 'madison420ivy', '--account' => 'fansapi'])
-            ->expectsOutputToContain('Madison Ivy')
-            ->assertSuccessful();
-
-        $this->assertSame(611_905, Profile::query()->whereRelation('account', 'slug', 'fansapi')->sole()->likes_count);
     }
 }

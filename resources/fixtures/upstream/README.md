@@ -1,15 +1,14 @@
 # Upstream response fixtures
 
-Used by the tests (`tests/`). The local fake upstream (`fake-upstream/server.php`) builds its answers in the same shapes (old, new, OnlyFans, Fans API) from its scenario instead of reading these files, and signs with its own made-up rules (`fake-upstream/rules.json`, `rules-rotated.json`).
+Used by the tests (`tests/`). The local fake upstream (`fake-upstream/server.php`) builds its answers in the same shapes (old, new, OnlyFans) from its scenario instead of reading these files, and signs with its own made-up rules (`fake-upstream/rules.json`, `rules-rotated.json`).
 
 OnlyFans' web app code is not stored here: the rules extraction tests build obfuscated code of the same shape from made-up rules (`tests/Support/SyntheticWebApp.php`).
 
 | File | What it is | Status |
 |---|---|---|
-| `onlyfans-madison420ivy.json` | Real OnlyFans `GET /api2/v2/users/madison420ivy` response (signed, guest session), captured 2026-11-04 by `docs/evidence/probe-onlyfans.py`. Likes are `favoritedCount`. The same 85 fields as Fans API's `data`, without its two `ofapi_*` fields. | 200 |
+| `onlyfans-madison420ivy.json` | Real OnlyFans `GET /api2/v2/users/madison420ivy` response (signed, guest session), captured 2026-11-04 by `docs/evidence/probe-onlyfans.py`. Likes are `favoritedCount`. | 200 |
 | `onlyfans-test-rules.json` | Made-up signing rules for the test host `upstream.test` (`prefix`/`suffix`/`app-token` shape). Not OnlyFans' rules. | – |
 | `onlyfans-test-rules-rotated.json` | A second made-up set (`format`/`app_token`/`remove_headers` shape), for the rotation test. | – |
-| `fansapi-madison420ivy.json` | Real Fans API `GET /api/profiles/madison420ivy` response, captured 2026-11-01 (cache hit, 0 credits). Likes are `data.favoritedCount`. | 200 |
 | `old-format.json` | Incident, before the change: `likes` at the top level, revision 10. | 200 |
 | `new-format.json` | Incident, after the change: `profile.likes`, revision 11. | 200 |
 | `missing-likes.json` | No likes anywhere: invalid. | 200 |

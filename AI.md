@@ -35,9 +35,6 @@
   release's rules were accepted on 4 Nov in a separate probe
   ([15](docs/evidence/15-live-probes.txt), section 3). The synthetic code the extractor tests use is a
   working program: it runs in Node and signs exactly as its rules say ([docs/signing.md](docs/signing.md)).
-- **Live data (first version, Fans API)**: a real `GET /api/profiles/madison420ivy` through the full
-  job path; later a live run showed the stale-cache rule working (a 12 h old cache, asked again with
-  `?fresh=true`, [11](docs/evidence/11-live-fresh-fetch.txt)).
 - **The failure before the fix**: the incident tests were committed with only the old handler in
   the tree (commit `83496a9`, [01](docs/evidence/01-incident-tests-before-fix.txt)) and fail 6 of 7
   there; at the current commit they pass with the fix and still fail 6 of 7 with
@@ -184,7 +181,6 @@ confirmed and fixed with a test:
   arithmetic using the fake upstream's latency instead of the live one.
 - **Not changed:**
   - the account gate still re-queues throttled work into the shared queue (a README limit);
-  - the Fans API cache logic stays in the shared refresher;
   - the `accounts.api_key` column keeps its name, although it now also holds an OnlyFans session
     credential.
 
@@ -199,10 +195,15 @@ Horizon ([14](docs/evidence/14-live-onlyfans-fetch.txt),
 setup does not fail the next time, the rules OnlyFans last accepted are now kept in the repository
 as the last default source, used with a warning when the web app's code cannot be read.
 
+**The Fans API client removed (8 Nov).** Since 4 Nov it had been kept as a second driver "for
+comparison", and its account still showed in the demo. I had it removed: the client, its cache rule
+and `?fresh=true` follow-up, its settings, its fixture and the 12 tests that covered them. A
+migration deletes `fansapi` accounts from existing databases. Requests go to onlyfans.com only.
+
 ## Not verified
 
 - That `favoritedCount` is the "likes" number OnlyFans shows on the profile page: it is the field
-  OnlyFans' own api2 returns and Fans API passes on, but the page itself was not compared.
+  OnlyFans' own api2 returns, but the page itself was not compared.
 - How long a guest session stays valid, and how many requests OnlyFans allows per session or per
   IP before it throttles: only a handful of live requests were made. 429 and 5xx from OnlyFans were
   never seen live; their handling is tested against fakes.
@@ -216,8 +217,6 @@ as the last default source, used with a warning when the web app's code cannot b
   ([17](docs/evidence/17-previous-release-rules.txt)).
 - The logged-in session mode (an account whose credential holds a browser session's user id,
   cookies and x-bc): tested with fakes only, no real logged-in session was used.
-- Real Fans API error responses (429/5xx shape, whether `Retry-After` is sent): every live call
-  returned 200.
 - Setup on macOS or Linux; only Windows 11 + Docker Desktop was used.
 - Behaviour at production scale; the throughput check is one healthy account on one machine.
 - Two workers truly racing on the same profile at the same instant: covered by the database

@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('slug')->unique();
             $table->string('name');
             $table->string('base_url');
-            // Encrypted at rest. Null = use services.fansapi.key from the environment.
+            // Encrypted at rest. A logged-in OnlyFans session (JSON); null = a guest session.
             $table->text('api_key')->nullable();
             $table->unsignedSmallInteger('max_concurrency')->nullable();
             $table->timestamps();

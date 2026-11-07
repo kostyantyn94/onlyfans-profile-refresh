@@ -11,12 +11,6 @@ enum Outcome: string
     case Unchanged = 'unchanged';
     // Valid response, older revision than stored (arrived late): ignored.
     case Stale = 'stale_ignored';
-    // Fans API answered from a cache older than allowed; asked again with ?fresh=true.
-    case CacheTooOld = 'cache_too_old';
-    // Asked for live data and still got a snapshot older than allowed: not stored,
-    // retried later (the upstream cannot reach OnlyFans right now).
-    case CacheStillTooOld = 'cache_still_too_old';
-
     // OnlyFans refused the request signature: the rules are reloaded and the
     // session renewed before the next try.
     case SignatureRejected = 'signature_rejected';
@@ -59,7 +53,7 @@ enum Outcome: string
     public function isRetryable(): bool
     {
         return in_array($this, [
-            self::RateLimited, self::ServerError, self::Timeout, self::CacheStillTooOld,
+            self::RateLimited, self::ServerError, self::Timeout,
             self::SignatureRejected, self::RulesUnavailable,
         ], true);
     }
