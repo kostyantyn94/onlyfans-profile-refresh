@@ -194,7 +194,9 @@ have kept the last good rules. A fresh setup, though, has no last good rules, so
 would have failed. The extractor was adjusted to read both shapes, the synthetic web app learned the
 new one, and the live check was repeated on the new release on 7 Nov: HTTP 200 in the CLI and in
 Horizon ([14](docs/evidence/14-live-onlyfans-fetch.txt),
-[docs/signing.md](docs/signing.md#where-the-rules-come-from-onlyfans-own-web-app)).
+[docs/signing.md](docs/signing.md#where-the-rules-come-from-onlyfans-own-web-app)). So that a fresh
+setup does not fail the next time, the rules OnlyFans last accepted are now kept in the repository
+as the last default source, used with a warning when the web app's code cannot be read.
 
 ## Not verified
 
@@ -205,7 +207,8 @@ Horizon ([14](docs/evidence/14-live-onlyfans-fetch.txt),
   never seen live; their handling is tested against fakes.
 - That the rules extraction keeps working across OnlyFans releases. It reads the releases of 3 and
   6 Nov, and the second one already needed three small adjustments. The next change of shape will
-  make it fail loudly again; the last good rules stay in use until it is adjusted.
+  make it fail loudly again; the last good rules (on a fresh setup, those kept in the repository)
+  stay in use until it is adjusted, for as long as OnlyFans accepts them.
 - How long OnlyFans keeps accepting an earlier release's rules. On 4 Nov it accepted the rafa-9
   feed's, which differ from the current release's, and rejected two other feeds'.
 - The logged-in session mode (an account whose credential holds a browser session's user id,

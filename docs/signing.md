@@ -91,9 +91,32 @@ rules. The 3 Nov release still gives exactly the rules above, and the 6 Nov one 
 (prefix `67795`, suffix `6aedf4bb`, constant −193; [16](evidence/16-webapp-rules.txt)). OnlyFans
 accepted them on 7 Nov ([14](evidence/14-live-onlyfans-fetch.txt)).
 
+**When the code cannot be read.** Refreshes keep signing with the last good rules, and OnlyFans may
+accept them for a while: on 4 Nov it accepted an earlier release's rules. A fresh setup has no last
+good rules. That is why the default sources end with the rules OnlyFans last accepted, kept in the
+repository: [`last-accepted-rules.json`](../resources/onlyfans/last-accepted-rules.json), the rules
+of [16](evidence/16-webapp-rules.txt), saved after the live check in
+[14](evidence/14-live-onlyfans-fetch.txt). Loading them logs `onlyfans.rules_loaded` as a warning,
+with the web app's error in `passed_over`. They are replaced by hand once new rules have been
+accepted live.
+
 **Other sources** (`ONLYFANS_RULES_SOURCES`, tried in order) are opt-in: a local JSON file to pin
 rules by hand, or a public rule feed. Feeds publish three different shapes. All three are read and
 validated strictly (types, index range 0–39, hex app token).
+
+### Why the code is read, not run
+
+Running the signing module (in Node, or a JavaScript engine inside PHP) would survive any change in
+the obfuscator's output: the module computes the signature whatever its shape. It is not done here
+because it means running code downloaded from a third party on the machines that hold the sessions.
+Reading the code as text has the opposite trade-off: nothing downloaded runs, but a new shape needs
+the extractor adjusted, as on 6 Nov.
+
+In production I would use both. A throwaway sandbox (a container with no network, no secrets, and
+limits on CPU, memory and time) runs each new release's module once, for a fixed path, time and
+user id. Its signature must equal the one built from the extracted rules. A mismatch, or a module
+the extractor refuses, alerts someone while the old rules still work. Requests are still signed
+here, from plain rules; nothing the sandbox produces is sent to OnlyFans.
 
 ## Tests without OnlyFans' code
 

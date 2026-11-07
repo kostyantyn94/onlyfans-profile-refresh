@@ -26,13 +26,18 @@ $ php artisan profiles:fetch madison420ivy                (live, 7 Nov: docs/evi
 2. **The rules.** The static param, prefix, suffix, checksum and app token are read at run time
    from OnlyFans' web app: the page, `app.js` and the obfuscated signing module. The module is
    decoded as text and never executed
-   ([`WebAppRulesExtractor`](app/Upstream/OnlyFans/WebAppRulesExtractor.php)). The rules are kept
+   ([`WebAppRulesExtractor`](app/Upstream/OnlyFans/WebAppRulesExtractor.php);
+   [why](docs/signing.md#why-the-code-is-read-not-run)). The rules are kept
    per release, and a response from a newer release reloads them.
 3. **The session.** There is one session per account, a guest by default. It holds a random
    `x-bc`, the cookies OnlyFans sets (with their expiry) and the user agent. It is encrypted in the
    cache and shared by all workers.
 
-Nothing else is called at run time: public rule feeds are an opt-in fallback, off by default.
+Nothing else is called at run time. If a release's code cannot be read and no good rules are
+cached (a fresh setup), the rules OnlyFans last accepted, kept in the repository
+([`last-accepted-rules.json`](resources/onlyfans/last-accepted-rules.json)), are used, with a warning.
+Public rule feeds are an opt-in fallback, off by default.
+
 Checked live:
 - [16](docs/evidence/16-webapp-rules.txt): the rules read from OnlyFans' release of 6 Nov,
   `202611061539-e69826e739`;
@@ -40,6 +45,17 @@ Checked live:
   CLI and in Horizon (7 Nov);
 - [15](docs/evidence/15-live-probes.txt), section 3: OnlyFans accepting the rules of the release
   before it, `202611031453-fbc506331f` (4 Nov).
+
+**Where to look first:**
+1. `./setup.sh`, then `docker compose exec app php artisan profiles:fetch madison420ivy`: a live
+   signed fetch, no key or login ([Run it](#run-it)).
+2. [docs/signing.md](docs/signing.md): the request, where the rules come from, and what happens
+   when OnlyFans changes them.
+3. [Changes after the review](#changes-after-the-review): each finding, its fix and its regression
+   test.
+4. [`ProfileRefresher`](app/Refresh/ProfileRefresher.php): one refresh, its attempt budget and its
+   transaction.
+5. [Before and after](#before-and-after): the incident workload, the old handler against the fixed one.
 
 [Changes after the review](#changes-after-the-review) · [Run it](#run-it) ·
 [Data source](#where-the-data-comes-from) · [The failure](#the-failure) ·
@@ -97,7 +113,7 @@ refresh is pending. Only tested on Windows 11 with Docker Desktop.
 |---|---|
 | `docker compose exec app php artisan profiles:fetch madison420ivy [--queue]` | fetch from onlyfans.com now in this process, or hand it to Horizon |
 | `docker compose exec app php artisan onlyfans:rules [--reload]` | the signing rules in use, read from OnlyFans' web app (no API request) |
-| `docker compose exec app php artisan test` | 178 tests (Postgres and Redis of their own, never a real upstream) |
+| `docker compose exec app php artisan test` | 179 tests (Postgres and Redis of their own, never a real upstream) |
 | `docker compose exec -e REFRESH_HANDLER=legacy app php artisan test --group=incident` | the incident tests against the **old** handler: 6 of 7 fail |
 | `docker compose exec app php artisan workload:run --handler=legacy` / `--handler=v2` | the workload, before / after |
 | `docker compose exec app php artisan workload:run --rotate-rules=4` | the same, with the signing rules changing 4 s in |
@@ -123,8 +139,9 @@ the rules and the session are described in [docs/signing.md](docs/signing.md). I
   - They are cached per host and shared by all workers. After 60 min one worker reloads them while
     the others keep signing.
   - A response from a newer release (`x-of-rev`) reloads them at once.
-  - If the web app's code changes shape, the extractor fails loudly. It never guesses, and the last
-    good rules stay in use.
+  - If the web app's code changes shape, the extractor fails loudly. It never guesses: the last
+    good rules stay in use, or on a fresh setup the rules OnlyFans last accepted, kept in the
+    repository. `onlyfans.rules_loaded` is then a warning that says why the web app was passed over.
 - **A refused signature** (HTTP 400, `"Please refresh the page"`) is `signature_rejected`. The rules
   are reloaded, the guest session is renewed and the refresh retries soon.
   - Rejections are counted per *session*, in a fixed 30-minute window. Rules OnlyFans accepted in
@@ -458,16 +475,18 @@ against what is stored.
 **If OnlyFans changes its signing** (accounts get `signature_rejected`):
 - **New release.** The first response from the new release (`x-of-rev`), or a rejection, marks the
   rules for reloading, so the next load reads the new release's code.
-- **Unreadable code.** If that code cannot be read, `onlyfans.rules_loaded` or
+- **Unreadable code.** If that code cannot be read, `onlyfans.rules_loaded` (a warning) or
   `onlyfans.rules_unavailable` says why. The last good rules stay in use while OnlyFans still accepts
-  them (on 4 Nov it accepted an earlier release's).
+  them (on 4 Nov it accepted an earlier release's); a fresh setup uses the rules OnlyFans last
+  accepted, kept in the repository.
 - **Old rules rejected.** Once OnlyFans rejects them too, every refresh ends in
   `signature_rejected` after its 3 tries and is retried later; `onlyfans.signature_rejected` and the
   failing-now count on the dashboard show it.
 
 To recover by hand, either adjust the extractor to the new code shape, or put the new rules in a
 JSON file and list it first in `ONLYFANS_RULES_SOURCES` (a public feed there works as a stopgap).
-`php artisan onlyfans:rules --reload` loads them at once and shows what is in use.
+`php artisan onlyfans:rules --reload` loads them at once and shows what is in use. Once new rules
+have been accepted live, they replace those in `resources/onlyfans/last-accepted-rules.json`.
 
 ## Remaining limits
 
@@ -529,8 +548,8 @@ Claude Code working as an agent; see [AI.md](AI.md).
 | *Afterwards (2 Nov, 00:00–00:30):* read-only public demo mode, hosting it through Tailscale Funnel | 0:30 |
 | *After the review (4 Nov, 01:40–03:05):* direct signed OnlyFans client (signing, rules, sessions), the three fixes with regression tests, live probes and the live check, fake upstream with signature checks and rules rotation, a third independent review and its fixes, evidence, docs, packaging | 1:25 |
 | *Then (4 Nov, 03:10–06:20):* the signing rules read from OnlyFans' own web app code (extractor, synthetic web app and its Node check, live extraction and probe), the fourth and fifth independent reviews (five reviewers) and their fixes, evidence re-recorded at the final code, clean-setup check, docs, packaging | 3:10 |
-| *Readiness check (6 Nov, 23:50 – 7 Nov, 03:00):* OnlyFans' new release of 6 Nov read (the extractor adjusted to its shape, the synthetic web app and tests extended), the live check repeated on it, evidence, docs, packaging | 3:10 |
-| **Total, both rounds** (the public demo not counted) | **10:39** |
+| *Readiness check (6–7 Nov: 23:50–00:05, 02:37–02:42, 06:04–06:30):* OnlyFans' new release of 6 Nov read (the extractor adjusted to its shape, the synthetic web app and tests extended), the live check repeated on it, the rules OnlyFans last accepted kept as the last source, evidence, docs, packaging | 0:46 |
+| **Total, both rounds** (the public demo not counted) | **8:15** |
 
 ## Layout
 
@@ -547,7 +566,8 @@ app/Console/        profiles:fetch|enqueue-due|repair, onlyfans:rules,
                     workload:run|check|crash|throughput|scheduler-memory
 fake-upstream/      stand-in for OnlyFans' api2 (checks signatures, can rotate its rules) and Fans API
 resources/fixtures/ upstream response fixtures, incl. real madison420ivy responses, made-up signing rules
-tests/              178 PHPUnit tests; Support/SyntheticWebApp builds obfuscated signing code from
+resources/onlyfans/ the signing rules OnlyFans last accepted: the last default source
+tests/              179 PHPUnit tests; Support/SyntheticWebApp builds obfuscated signing code from
                     made-up rules (no OnlyFans code is in the repository)
 docs/               signing.md, scaling.md; evidence/ (tests, workload, crash, throughput, memory, clean setup, live fetches)
 ```
