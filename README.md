@@ -44,7 +44,9 @@ Checked live:
 - [14](docs/evidence/14-live-onlyfans-fetch.txt): the fetch signed with them, through the job, in the
   CLI and in Horizon (7 Nov);
 - [15](docs/evidence/15-live-probes.txt), section 3: OnlyFans accepting the rules of the release
-  before it, `202611031453-fbc506331f` (4 Nov).
+  before it, `202611031453-fbc506331f` (4 Nov);
+- [17](docs/evidence/17-previous-release-rules.txt): OnlyFans still accepting those 3 Nov rules a day
+  after the 6 Nov release (7 Nov), which is what the rules kept in the repository rely on.
 
 **Where to look first:**
 1. `./setup.sh`, then `docker compose exec app php artisan profiles:fetch madison420ivy`: a live
@@ -477,8 +479,8 @@ against what is stored.
   rules for reloading, so the next load reads the new release's code.
 - **Unreadable code.** If that code cannot be read, `onlyfans.rules_loaded` (a warning) or
   `onlyfans.rules_unavailable` says why. The last good rules stay in use while OnlyFans still accepts
-  them (on 4 Nov it accepted an earlier release's); a fresh setup uses the rules OnlyFans last
-  accepted, kept in the repository.
+  them (on 7 Nov it still accepted the 3 Nov release's, [17](docs/evidence/17-previous-release-rules.txt));
+  a fresh setup uses the rules OnlyFans last accepted, kept in the repository.
 - **Old rules rejected.** Once OnlyFans rejects them too, every refresh ends in
   `signature_rejected` after its 3 tries and is retried later; `onlyfans.signature_rejected` and the
   failing-now count on the dashboard show it.
@@ -505,7 +507,9 @@ have been accepted live, they replace those in `resources/onlyfans/last-accepted
   adjusted the same day ([docs/signing.md](docs/signing.md)). The next such change will need the
   same; until then the last good rules stay in use. A digest other than SHA-1 would fail loudly too.
 - **How long OnlyFans accepts an earlier release's rules is unknown.** On 4 Nov it accepted at least
-  one earlier set.
+  one earlier set; on 7 Nov, a day after the 6 Nov release, it still accepted the 3 Nov rules
+  ([17](docs/evidence/17-previous-release-rules.txt)). The fallback to the rules kept in the
+  repository lasts as long as that does.
 - **The revision of an OnlyFans answer is the local time the request was sent**, so workers on
   different machines need synchronised clocks; a skew larger than the time between two refreshes of
   one profile could order their answers wrongly.
@@ -548,8 +552,8 @@ Claude Code working as an agent; see [AI.md](AI.md).
 | *Afterwards (2 Nov, 00:00–00:30):* read-only public demo mode, hosting it through Tailscale Funnel | 0:30 |
 | *After the review (4 Nov, 01:40–03:05):* direct signed OnlyFans client (signing, rules, sessions), the three fixes with regression tests, live probes and the live check, fake upstream with signature checks and rules rotation, a third independent review and its fixes, evidence, docs, packaging | 1:25 |
 | *Then (4 Nov, 03:10–06:20):* the signing rules read from OnlyFans' own web app code (extractor, synthetic web app and its Node check, live extraction and probe), the fourth and fifth independent reviews (five reviewers) and their fixes, evidence re-recorded at the final code, clean-setup check, docs, packaging | 3:10 |
-| *Readiness check (6–7 Nov: 23:50–00:05, 02:37–02:42, 06:04–06:30):* OnlyFans' new release of 6 Nov read (the extractor adjusted to its shape, the synthetic web app and tests extended), the live check repeated on it, the rules OnlyFans last accepted kept as the last source, evidence, docs, packaging | 0:46 |
-| **Total, both rounds** (the public demo not counted) | **8:15** |
+| *Readiness check (6–7 Nov: 23:50–00:05, 02:37–02:42, 06:04–06:14, 07:51–08:00):* OnlyFans' new release of 6 Nov read (the extractor adjusted to its shape, the synthetic web app and tests extended), the live check repeated on it, the rules OnlyFans last accepted kept as the last source and checked live, evidence, docs, packaging | 0:39 |
+| **Total, both rounds** (the public demo not counted) | **8:08** |
 
 ## Layout
 

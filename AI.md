@@ -90,7 +90,8 @@ these notes; I set the direction and ran the live checks.
   (which rule feed is current, which headers and cookies a guest request needs, what a bad signature
   and an unknown user get, whether the rules read from OnlyFans' code are accepted) and the live
   check through the job. I ran them and pasted the output back, and the client was built from that
-  ([15](docs/evidence/15-live-probes.txt), [14](docs/evidence/14-live-onlyfans-fetch.txt)). The
+  ([15](docs/evidence/15-live-probes.txt), [14](docs/evidence/14-live-onlyfans-fetch.txt),
+  [17](docs/evidence/17-previous-release-rules.txt)). The
   agent itself only downloaded OnlyFans' public page and scripts, as a browser does, to read the
   rules.
 - **Each of your three findings has a regression test that fails on the reviewed code**, recorded
@@ -210,7 +211,9 @@ as the last default source, used with a warning when the web app's code cannot b
   make it fail loudly again; the last good rules (on a fresh setup, those kept in the repository)
   stay in use until it is adjusted, for as long as OnlyFans accepts them.
 - How long OnlyFans keeps accepting an earlier release's rules. On 4 Nov it accepted the rafa-9
-  feed's, which differ from the current release's, and rejected two other feeds'.
+  feed's, which differ from the current release's, and rejected two other feeds'. On 7 Nov, a day
+  after the 6 Nov release, it still accepted the 3 Nov rules
+  ([17](docs/evidence/17-previous-release-rules.txt)).
 - The logged-in session mode (an account whose credential holds a browser session's user id,
   cookies and x-bc): tested with fakes only, no real logged-in session was used.
 - Real Fans API error responses (429/5xx shape, whether `Retry-After` is sent): every live call

@@ -92,8 +92,9 @@ rules. The 3 Nov release still gives exactly the rules above, and the 6 Nov one 
 accepted them on 7 Nov ([14](evidence/14-live-onlyfans-fetch.txt)).
 
 **When the code cannot be read.** Refreshes keep signing with the last good rules, and OnlyFans may
-accept them for a while: on 4 Nov it accepted an earlier release's rules. A fresh setup has no last
-good rules. That is why the default sources end with the rules OnlyFans last accepted, kept in the
+accept them for a while: on 4 Nov it accepted an earlier release's rules, and on 7 Nov, a day after
+the 6 Nov release, it still accepted the 3 Nov rules ([17](evidence/17-previous-release-rules.txt)).
+A fresh setup has no last good rules. That is why the default sources end with the rules OnlyFans last accepted, kept in the
 repository: [`last-accepted-rules.json`](../resources/onlyfans/last-accepted-rules.json), the rules
 of [16](evidence/16-webapp-rules.txt), saved after the live check in
 [14](evidence/14-live-onlyfans-fetch.txt). Loading them logs `onlyfans.rules_loaded` as a warning,
