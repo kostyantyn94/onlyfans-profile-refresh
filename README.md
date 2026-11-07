@@ -492,7 +492,8 @@ have been accepted live, they replace those in `resources/onlyfans/last-accepted
   `storage/`, `bootstrap/cache` and `.env` writable for the containers' user, which may not be enough
   on every setup.
   A fresh clone in an empty folder at the final code ([10](docs/evidence/10-clean-setup.txt)):
-  `setup.sh`, the test suite, the rules read from OnlyFans' web app, the UI answering. It ran as a
+  `setup.sh` (it seeds the `onlyfans` account only), the test suite, the rules read from OnlyFans'
+  web app, the UI answering. It ran as a
   second stack next to the first, with the base URL on the fake upstream so that it made no API
   request to onlyfans.com.
 - **The rules extraction follows the obfuscator's output shape**: a string table, the rotation
@@ -549,7 +550,8 @@ Claude Code working as an agent; see [AI.md](AI.md).
 | *After the review (4 Nov, 01:40–03:05):* direct signed OnlyFans client (signing, rules, sessions), the three fixes with regression tests, live probes and the live check, fake upstream with signature checks and rules rotation, a third independent review and its fixes, evidence, docs, packaging | 1:25 |
 | *Then (4 Nov, 03:10–06:20):* the signing rules read from OnlyFans' own web app code (extractor, synthetic web app and its Node check, live extraction and probe), the fourth and fifth independent reviews (five reviewers) and their fixes, evidence re-recorded at the final code, clean-setup check, docs, packaging | 3:10 |
 | *Readiness check (6–7 Nov: 23:50–00:05, 02:37–02:42, 06:04–06:14, 07:51–08:00):* OnlyFans' new release of 6 Nov read (the extractor adjusted to its shape, the synthetic web app and tests extended), the live check repeated on it, the rules OnlyFans last accepted kept as the last source and checked live, evidence, docs, packaging | 0:39 |
-| **Total, both rounds** (the public demo not counted) | **8:08** |
+| *8 Nov, 01:15–01:35:* the Fans API client removed (client, cache rule, settings, fixture, its tests; a migration for existing databases), docs, evidence, packaging | 0:20 |
+| **Total, both rounds** (the public demo not counted) | **8:28** |
 
 ## Layout
 

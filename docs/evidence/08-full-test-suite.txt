@@ -1,56 +1,54 @@
-# Commit bcd8647 (Fall back to the rules OnlyFans last accepted, kept in the repository), recorded 2026-11-07T04:08Z
+# Commit 826b2c5 (Remove the Fans API client: requests go to onlyfans.com only), recorded 2026-11-07T23:25Z
+
 
    PASS  Tests\Unit\ProfilePayloadParserTest
-  ✓ real fans api response for madison420ivy                             0.45s  
-  ✓ real onlyfans response for madison420ivy                             0.09s  
-  ✓ onlyfans user without favorited count is invalid                     0.07s  
-  ✓ fans api response without cache timestamp uses the request time      0.08s  
-  ✓ fans api response without favorited count is invalid                 0.09s  
-  ✓ old format                                                           0.10s  
-  ✓ new format                                                           0.09s  
-  ✓ explicit zero likes is valid                                         0.12s  
-  ✓ missing likes is invalid                                             0.12s  
-  ✓ negative likes is invalid                                            0.09s  
-  ✓ non numeric likes is invalid                                         0.09s  
-  ✓ likes that are not a whole non negative number are invalid with dat… 0.08s  
-  ✓ likes that are not a whole non negative number are invalid with dat… 0.07s  
+  ✓ real onlyfans response for madison420ivy                             0.37s  
+  ✓ onlyfans user without favorited count is invalid                     0.08s  
+  ✓ old format                                                           0.06s  
+  ✓ new format                                                           0.06s  
+  ✓ explicit zero likes is valid                                         0.07s  
+  ✓ missing likes is invalid                                             0.06s  
+  ✓ negative likes is invalid                                            0.07s  
+  ✓ non numeric likes is invalid                                         0.06s  
+  ✓ likes that are not a whole non negative number are invalid with dat… 0.06s  
+  ✓ likes that are not a whole non negative number are invalid with dat… 0.06s  
+  ✓ likes that are not a whole non negative number are invalid with dat… 0.06s  
+  ✓ likes that are not a whole non negative number are invalid with dat… 0.06s  
+  ✓ likes that are not a whole non negative number are invalid with dat… 0.06s  
   ✓ likes that are not a whole non negative number are invalid with dat… 0.09s  
+  ✓ likes that are not a whole non negative number are invalid with dat… 0.06s  
+  ✓ likes that are not a whole non negative number are invalid with dat… 0.05s  
   ✓ likes that are not a whole non negative number are invalid with dat… 0.09s  
-  ✓ likes that are not a whole non negative number are invalid with dat… 0.09s  
-  ✓ likes that are not a whole non negative number are invalid with dat… 0.09s  
-  ✓ likes that are not a whole non negative number are invalid with dat… 0.10s  
-  ✓ likes that are not a whole non negative number are invalid with dat… 0.08s  
-  ✓ likes that are not a whole non negative number are invalid with dat… 0.08s  
-  ✓ numeric strings and whole floats are accepted                        0.10s  
-  ✓ conflicting likes in both places is invalid                          0.10s  
-  ✓ the same likes in both places is fine                                0.09s  
-  ✓ missing or bad revision is invalid                                   0.08s  
-  ✓ malformed bodies are invalid with data set "empty ( h t t p 500 bod… 0.07s  
-  ✓ malformed bodies are invalid with data set "truncated"               0.11s  
-  ✓ malformed bodies are invalid with data set "html error page"         0.09s  
-  ✓ malformed bodies are invalid with data set "json list"               0.10s  
-  ✓ malformed bodies are invalid with data set "json string"             0.10s  
-  ✓ malformed bodies are invalid with data set "profile is a list"       0.08s  
-  ✓ malformed bodies are invalid with data set "data is a string"        0.06s  
-  ✓ truncated fixture is invalid                                         0.07s  
-  ✓ an oversized body is refused before decoding                         0.09s  
-  ✓ optional fields with unexpected types are skipped not fatal          0.07s  
-  ✓ optional fields that would not fit their columns are skipped         0.07s  
+  ✓ numeric strings and whole floats are accepted                        0.06s  
+  ✓ conflicting likes in both places is invalid                          0.06s  
+  ✓ the same likes in both places is fine                                0.06s  
+  ✓ missing or bad revision is invalid                                   0.06s  
+  ✓ malformed bodies are invalid with data set "empty ( h t t p 500 bod… 0.06s  
+  ✓ malformed bodies are invalid with data set "truncated"               0.06s  
+  ✓ malformed bodies are invalid with data set "html error page"         0.06s  
+  ✓ malformed bodies are invalid with data set "json list"               0.08s  
+  ✓ malformed bodies are invalid with data set "json string"             0.07s  
+  ✓ malformed bodies are invalid with data set "profile is a list"       0.11s  
+  ✓ malformed bodies are invalid with data set "data is a string"        0.08s  
+  ✓ truncated fixture is invalid                                         0.09s  
+  ✓ an oversized body is refused before decoding                         0.10s  
+  ✓ optional fields with unexpected types are skipped not fatal          0.09s  
+  ✓ optional fields that would not fit their columns are skipped         0.09s  
 
    PASS  Tests\Unit\RefreshPolicyTest
-  ✓ refresh interval by likes with data set "zero"                       0.25s  
-  ✓ refresh interval by likes with data set "just below"                 0.14s  
-  ✓ refresh interval by likes with data set "exactly 100,000 belongs to… 0.09s  
-  ✓ refresh interval by likes with data set "just above"                 0.11s  
-  ✓ refresh interval by likes with data set "the task profile"           0.25s  
-  ✓ refresh interval by likes with data set "madison420ivy"              0.14s  
-  ✓ backoff grows is randomised and capped                               0.16s  
-  ✓ retry after header                                                   0.10s  
+  ✓ refresh interval by likes with data set "zero"                       0.10s  
+  ✓ refresh interval by likes with data set "just below"                 0.09s  
+  ✓ refresh interval by likes with data set "exactly 100,000 belongs to… 0.08s  
+  ✓ refresh interval by likes with data set "just above"                 0.07s  
+  ✓ refresh interval by likes with data set "the task profile"           0.08s  
+  ✓ refresh interval by likes with data set "madison420ivy"              0.07s  
+  ✓ backoff grows is randomised and capped                               0.08s  
+  ✓ retry after header                                                   0.09s  
 
    PASS  Tests\Unit\RequestSignerTest
-  ✓ it matches an independent implementation                             0.02s  
+  ✓ it matches an independent implementation                             0.04s  
   ✓ every signed input changes the signature                             0.01s  
-  ✓ a negative checksum is written as its absolute value
+  ✓ a negative checksum is written as its absolute value                 0.01s  
   ✓ rules are read from every published shape with data set "prefix / suffix / app-token"
   ✓ rules are read from every published shape with data set "start / end / app token"
   ✓ rules are read from every published shape with data set "format and remove headers"
@@ -62,7 +60,7 @@
   ✓ invalid rules are refused with data set "prefix with a colon"
 
    PASS  Tests\Unit\WebAppRulesExtractorTest
-  ✓ it recovers the rules the code was built from with data set "shippe… 0.02s  
+  ✓ it recovers the rules the code was built from with data set "shippe… 0.01s  
   ✓ it recovers the rules the code was built from with data set "rotated by 1"
   ✓ it recovers the rules the code was built from with data set "rotated by 17"
   ✓ it recovers the rules the code was built from with data set "the later shape, rotated by 5"
@@ -77,138 +75,129 @@
   ✓ the checksum is evaluated as a sum of digest characters
 
    PASS  Tests\Feature\AccountIsolationTest
-  ✓ a cooling down account waits while another account is served         0.19s  
-  ✓ an account cannot use more than its concurrency limit                0.10s  
-  ✓ deferring does not call the upstream or spend a retry                0.13s  
-  ✓ a cooldown is extended but never shortened                           0.10s  
+  ✓ a cooling down account waits while another account is served         0.16s  
+  ✓ an account cannot use more than its concurrency limit                0.09s  
+  ✓ deferring does not call the upstream or spend a retry                0.09s  
+  ✓ a cooldown is extended but never shortened                           0.08s  
 
    PASS  Tests\Feature\IncidentRegressionTest
-  ✓ old format is still accepted                                         0.26s  
-  ✓ new format with likes inside profile is stored                       0.14s  
-  ✓ rate limit without retry after keeps data and is retried later       0.21s  
-  ✓ server error with empty body keeps data and is retried later         0.27s  
-  ✓ missing likes is invalid not zero                                    0.25s  
-  ✓ an older revision arriving last does not overwrite newer data        0.22s  
-  ✓ the same job delivered twice neither duplicates nor corrupts         0.18s  
+  ✓ old format is still accepted                                         0.10s  
+  ✓ new format with likes inside profile is stored                       0.08s  
+  ✓ rate limit without retry after keeps data and is retried later       0.13s  
+  ✓ server error with empty body keeps data and is retried later         0.12s  
+  ✓ missing likes is invalid not zero                                    0.15s  
+  ✓ an older revision arriving last does not overwrite newer data        0.11s  
+  ✓ the same job delivered twice neither duplicates nor corrupts         0.11s  
 
    PASS  Tests\Feature\OnlyFansClientTest
-  ✓ the request is signed like the web app does it                       0.17s  
-  ✓ with rules read from the web app the request carries its release     0.13s  
-  ✓ the real onlyfans response stores the full profile                   0.17s  
-  ✓ an unknown user is not found and not retried                         0.18s  
-  ✓ the guest session keeps its x bc and the cookies onlyfans sets       0.15s  
-  ✓ a rejected signature renews the session and moves to the next rules… 0.15s  
-  ✓ without usable rules nothing is sent and the refresh waits           0.15s  
-  ✓ rules are loaded once and shared                                     0.14s  
-  ✓ a logged in session sends its user id and cookies                    0.14s  
-  ✓ session secrets stay out of logs and are stored encrypted            0.15s  
-  ✓ an onlyfans user object without likes is invalid                     0.15s  
+  ✓ the request is signed like the web app does it                       0.10s  
+  ✓ with rules read from the web app the request carries its release     0.09s  
+  ✓ the real onlyfans response stores the full profile                   0.10s  
+  ✓ an unknown user is not found and not retried                         0.15s  
+  ✓ the guest session keeps its x bc and the cookies onlyfans sets       0.13s  
+  ✓ a rejected signature renews the session and moves to the next rules… 0.16s  
+  ✓ without usable rules nothing is sent and the refresh waits           0.14s  
+  ✓ rules are loaded once and shared                                     0.10s  
+  ✓ a logged in session sends its user id and cookies                    0.11s  
+  ✓ session secrets stay out of logs and are stored encrypted            0.10s  
+  ✓ an onlyfans user object without likes is invalid                     0.11s  
 
    PASS  Tests\Feature\ProfilePagesTest
-  ✓ the list shows profiles and search finds them case insensitively     0.45s  
-  ✓ the profile page keeps success and failure apart                     0.17s  
-  ✓ tracking a username creates one profile and queues one refresh       0.08s  
-  ✓ refresh now is refused while one is pending                          0.07s  
-  ✓ bad usernames are rejected                                           0.08s  
+  ✓ the list shows profiles and search finds them case insensitively     0.41s  
+  ✓ the profile page keeps success and failure apart                     0.18s  
+  ✓ tracking a username creates one profile and queues one refresh       0.09s  
+  ✓ refresh now is refused while one is pending                          0.08s  
+  ✓ bad usernames are rejected                                           0.09s  
 
    PASS  Tests\Feature\PublicDemoTest
-  ✓ proxied visitors can read but not track refresh or open horizon      0.43s  
-  ✓ pagination links use the public https url                            2.11s  
-  ✓ requests made on the machine itself are unaffected                   0.37s  
-  ✓ off by default                                                       0.12s  
+  ✓ proxied visitors can read but not track refresh or open horizon      0.30s  
+  ✓ pagination links use the public https url                            1.14s  
+  ✓ requests made on the machine itself are unaffected                   0.18s  
+  ✓ off by default                                                       0.08s  
 
    PASS  Tests\Feature\RealWorkerTest
-  ✓ a failed attempt is released with a delay and retried by the worker  0.22s  
-  ✓ the account gate defers a job in a real worker without calling the…  0.15s  
-  ✓ a job that keeps throwing gives up after max exceptions              0.21s  
-  ✓ a queued job replaced after its claim expired stops without calling… 0.21s  
+  ✓ a failed attempt is released with a delay and retried by the worker  0.11s  
+  ✓ the account gate defers a job in a real worker without calling the…  0.09s  
+  ✓ a job that keeps throwing gives up after max exceptions              0.13s  
+  ✓ a queued job replaced after its claim expired stops without calling… 0.11s  
 
    PASS  Tests\Feature\RefreshJobTest
-  ✓ real fans api response stores the full profile                       0.15s  
-  ✓ the account key falls back to the environment                        0.25s  
-  ✓ a 429 pauses the whole account                                       0.26s  
-  ✓ retry after is honoured when present                                 0.21s  
-  ✓ rate limits give up after the retry budget                           0.20s  
-  ✓ server errors give up after four attempts                            0.27s  
-  ✓ a refresh that runs out of 429 retries is one failed refresh         0.26s  
-  ✓ a timeout is retried with backoff                                    0.18s  
-  ✓ permanent failures are not retried with data set "profile gone"      0.19s  
-  ✓ permanent failures are not retried with data set "profile deleted"   0.17s  
-  ✓ permanent failures are not retried with data set "bad key"           0.19s  
-  ✓ permanent failures are not retried with data set "forbidden"         0.17s  
-  ✓ permanent failures are not retried with data set "bad request"       0.15s  
-  ✓ an invalid response is not retried and keeps data                    0.18s  
-  ✓ explicit zero likes is stored                                        0.20s  
-  ✓ exactly 100000 likes is refreshed every 72 hours                     0.17s  
-  ✓ the same revision again confirms the data without rewriting it       0.17s  
-  ✓ a late older response is recorded as stale                           0.21s  
-  ✓ last attempt success and failure stay distinguishable                0.24s  
-  ✓ an old cached fans api snapshot is fetched again fresh               0.18s  
-  ✓ a recent cached snapshot is used as is                               0.17s  
-  ✓ a fresh request that still returns an old snapshot is not stored     0.16s  
-  ✓ a fresh answer marked live but taken long ago is not stored          0.16s  
-  ✓ no live request is sent when it would exceed the attempt budget      0.20s  
-  ✓ a redelivered job with no attempts left does not call the upstream   0.15s  
-  ✓ a profile write and its attempt row commit together with data set "… 0.15s  
-  ✓ a profile write and its attempt row commit together with data set "… 0.21s  
-  ✓ the same revision with different likes corrects the stored row       0.17s  
+  ✓ a 429 pauses the whole account                                       0.13s  
+  ✓ retry after is honoured when present                                 0.09s  
+  ✓ rate limits give up after the retry budget                           0.12s  
+  ✓ server errors give up after four attempts                            0.12s  
+  ✓ a refresh that runs out of 429 retries is one failed refresh         0.20s  
+  ✓ a timeout is retried with backoff                                    0.09s  
+  ✓ permanent failures are not retried with data set "profile gone"      0.10s  
+  ✓ permanent failures are not retried with data set "profile deleted"   0.19s  
+  ✓ permanent failures are not retried with data set "bad key"           0.10s  
+  ✓ permanent failures are not retried with data set "forbidden"         0.16s  
+  ✓ permanent failures are not retried with data set "bad request"       0.10s  
+  ✓ an invalid response is not retried and keeps data                    0.11s  
+  ✓ explicit zero likes is stored                                        0.22s  
+  ✓ exactly 100000 likes is refreshed every 72 hours                     0.27s  
+  ✓ the same revision again confirms the data without rewriting it       0.13s  
+  ✓ a late older response is recorded as stale                           0.16s  
+  ✓ last attempt success and failure stay distinguishable                0.15s  
+  ✓ a redelivered job with no attempts left does not call the upstream   0.16s  
+  ✓ a profile write and its attempt row commit together with data set "… 0.14s  
+  ✓ a profile write and its attempt row commit together with data set "… 0.10s  
+  ✓ the same revision with different likes corrects the stored row       0.11s  
   ✓ a replayed old job does not release a newer claim                    0.13s  
-  ✓ a job whose claim was taken over does not call the upstream          0.18s  
-  ✓ the last 429 of a refresh still pauses the account                   0.13s  
-  ✓ repeated final failures back off instead of retrying hourly          0.16s  
-  ✓ a stale response does not bring the next refresh forward or loop     0.19s  
-  ✓ giving up releases the claim and keeps data                          0.15s  
-  ✓ retry after on a 503 is honoured                                     0.17s  
-  ✓ a cached fans api answer without a date is not taken as fresh        0.16s  
-  ✓ an old job giving up does not mark a newer refresh as failed         0.13s  
-  ✓ an answer for another profile is not written                         0.18s  
-  ✓ nothing is recorded when the request cannot even be built            0.17s  
-  ✓ waiting for another workers rules load spends no attempt             1.90s  
-  ✓ logs follow a refresh and never contain the key                      0.14s  
+  ✓ a job whose claim was taken over does not call the upstream          0.10s  
+  ✓ the last 429 of a refresh still pauses the account                   0.09s  
+  ✓ repeated final failures back off instead of retrying hourly          0.14s  
+  ✓ a stale response does not bring the next refresh forward or loop     0.10s  
+  ✓ giving up releases the claim and keeps data                          0.09s  
+  ✓ retry after on a 503 is honoured                                     0.12s  
+  ✓ an old job giving up does not mark a newer refresh as failed         0.08s  
+  ✓ an answer for another profile is not written                         0.12s  
+  ✓ nothing is recorded when the request cannot even be built            0.09s  
+  ✓ waiting for another workers rules load spends no attempt             1.84s  
+  ✓ logs follow a refresh                                                0.10s  
 
    PASS  Tests\Feature\RefreshSchedulingTest
-  ✓ due profiles are queued once                                         0.13s  
-  ✓ a manual refresh is refused while one is pending                     0.11s  
-  ✓ a lost claim expires and is queued again                             0.14s  
-  ✓ batches cover every due profile                                      0.13s  
-  ✓ the legacy handler can be selected for reproduction                  0.11s  
-  ✓ one profile per account and username                                 0.12s  
+  ✓ due profiles are queued once                                         0.10s  
+  ✓ a manual refresh is refused while one is pending                     0.08s  
+  ✓ a lost claim expires and is queued again                             0.08s  
+  ✓ batches cover every due profile                                      0.09s  
+  ✓ the legacy handler can be selected for reproduction                  0.13s  
+  ✓ one profile per account and username                                 0.13s  
   ✓ the fetch command tracks and refreshes a profile                     0.14s  
-  ✓ the fetch command can use the fans api account                       0.14s  
 
    PASS  Tests\Feature\RepairProfilesTest
-  ✓ without repair a profile the old handler broke waits for its next s… 0.12s  
-  ✓ repair clears the revision and requeues profiles written during the… 0.12s  
-  ✓ dry run changes nothing                                              0.08s  
+  ✓ without repair a profile the old handler broke waits for its next s… 0.08s  
+  ✓ repair clears the revision and requeues profiles written during the… 0.10s  
+  ✓ dry run changes nothing                                              0.06s  
 
    PASS  Tests\Feature\SessionStoreTest
-  ✓ a session dropped after a rejection is not brought back by a late r… 0.11s  
-  ✓ a late rejection of an old session does not drop the new one         0.08s  
-  ✓ expired cookies are not sent                                         0.07s  
-  ✓ an unreadable stored session is replaced                             0.09s  
+  ✓ a session dropped after a rejection is not brought back by a late r… 0.07s  
+  ✓ a late rejection of an old session does not drop the new one         0.06s  
+  ✓ expired cookies are not sent                                         0.06s  
+  ✓ an unreadable stored session is replaced                             0.07s  
   ✓ concurrent responses do not undo each others cookies                 0.06s  
-  ✓ removing the login returns the account to a guest session            0.07s  
-  ✓ a logged in session follows the cookies onlyfans sets                0.10s  
+  ✓ removing the login returns the account to a guest session            0.12s  
+  ✓ a logged in session follows the cookies onlyfans sets                0.09s  
 
    PASS  Tests\Feature\SigningRulesProviderTest
-  ✓ rejections from one session do not condemn the rules                 0.11s  
-  ✓ rules rejected for two sessions give way to the next source          0.09s  
-  ✓ rules onlyfans accepted recently are not blamed for rejections       0.13s  
-  ✓ a rejection reloads the rules once not once per request in flight    0.08s  
-  ✓ the only source is never skipped                                     0.14s  
-  ✓ a newer release reloads the rules once however many responses show…  0.09s  
-  ✓ the rejection window does not slide                                  0.12s  
-  ✓ a response from a newer web app release reloads the rules            0.12s  
-  ✓ a failed load is remembered instead of asking the sources again      0.10s  
-  ✓ stale rules are used while another worker reloads them               0.13s  
+  ✓ rejections from one session do not condemn the rules                 0.10s  
+  ✓ rules rejected for two sessions give way to the next source          0.08s  
+  ✓ rules onlyfans accepted recently are not blamed for rejections       0.09s  
+  ✓ a rejection reloads the rules once not once per request in flight    0.10s  
+  ✓ the only source is never skipped                                     0.09s  
+  ✓ a newer release reloads the rules once however many responses show…  0.11s  
+  ✓ the rejection window does not slide                                  0.09s  
+  ✓ a response from a newer web app release reloads the rules            0.08s  
+  ✓ a failed load is remembered instead of asking the sources again      0.08s  
+  ✓ stale rules are used while another worker reloads them               0.09s  
   ✓ rules are read from the web app and kept per release                 0.11s  
-  ✓ when the web app cannot be read the next source is used              0.10s  
-  ✓ the rules kept in the repository take over when the web app cannot…  0.12s  
-  ✓ a release that cannot be read is not downloaded again on every relo… 0.18s  
+  ✓ when the web app cannot be read the next source is used              0.09s  
+  ✓ the rules kept in the repository take over when the web app cannot…  0.11s  
+  ✓ a release that cannot be read is not downloaded again on every relo… 0.10s  
   ✓ a download failure is not taken for unreadable code                  0.13s  
-  ✓ the rules in use and their source can be shown                       0.13s  
-  ✓ the last good rules stay in use when the sources fail                0.12s  
+  ✓ the rules in use and their source can be shown                       0.09s  
+  ✓ the last good rules stay in use when the sources fail                0.10s  
 
-  Tests:    179 passed (4610 assertions)
-  Duration: 26.40s
+  Tests:    167 passed (4559 assertions)
+  Duration: 18.04s
 
