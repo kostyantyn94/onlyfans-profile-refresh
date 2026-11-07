@@ -29,7 +29,7 @@ rate to size from and show where to look first.
 |---|---|
 | Peak arrivals | refreshes queued per second, in total and per account; how much the 24 h / 72 h schedule bunches up (profiles added together come due together) |
 | Job duration | p50/p95/p99 of the upstream call and of our own time, per account |
-| Concurrent work | in-flight jobs = arrival rate × duration (Little's law). With the fake upstream's 85 ms: 579/s × 0.085 s ≈ 49 busy workers. With live OnlyFans calls (250–370 ms in [14](evidence/14-live-onlyfans-fetch.txt)): 579/s × ~0.3 s ≈ 175 busy workers on average, as many database connections (a pooler such as PgBouncer in front of Postgres), several times that at peak or when the upstream slows to seconds |
+| Concurrent work | in-flight jobs = arrival rate × duration (Little's law). With the fake upstream's 85 ms: 579/s × 0.085 s ≈ 49 busy workers. With live OnlyFans calls (240–360 ms in [14](evidence/14-live-onlyfans-fetch.txt)): 579/s × ~0.3 s ≈ 175 busy workers on average, as many database connections (a pooler such as PgBouncer in front of Postgres), several times that at peak or when the upstream slows to seconds |
 | Retry amplification | upstream requests per successful refresh, by outcome: 429s, 5xx, `signature_rejected` after each OnlyFans release (and, with the Fans API driver, the `?fresh=true` follow-ups) |
 | Database | statements/s (≈ 9 × 579 ≈ 5.2 k/s on average, 2.3 k of them writes), WAL volume, lock waits on `profiles`, growth of `refresh_attempts` (≥ 50 M rows/day) |
 | Redis | ops/s, memory used by Horizon's job metadata, size of the delayed set, how many pops end in a deferral |

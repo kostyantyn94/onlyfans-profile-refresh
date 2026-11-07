@@ -7,13 +7,13 @@ own web app code. Horizon workers keep the profile fresh. The incident from the 
 fixed and measured.
 
 ```text
-$ php artisan profiles:fetch madison420ivy                (live, 4 Nov: docs/evidence/14)
+$ php artisan profiles:fetch madison420ivy                (live, 7 Nov: docs/evidence/14)
 | name                    | Madison Ivy                          |
 | upstream id             | 5140520                              |
-| likes                   | 612,019                              |
+| likes                   | 612,132                              |
 | posts / photos / videos | 178 / 623 / 202                      |
 | fields stored (raw)     | 85                                   |
-| this attempt            | success, HTTP 200, 248 ms            |
+| this attempt            | success, HTTP 200, 359 ms            |
 ```
 
 **How the request is made** (details: [docs/signing.md](docs/signing.md)):
@@ -33,10 +33,13 @@ $ php artisan profiles:fetch madison420ivy                (live, 4 Nov: docs/evi
    cache and shared by all workers.
 
 Nothing else is called at run time: public rule feeds are an opt-in fallback, off by default.
-Checked live on 4 Nov:
-- [14](docs/evidence/14-live-onlyfans-fetch.txt): the fetch through the job, in the CLI and in Horizon;
-- [16](docs/evidence/16-webapp-rules.txt): the rules read from release `202611031453-fbc506331f`;
-- [15](docs/evidence/15-live-probes.txt), section 3: OnlyFans accepting those rules.
+Checked live:
+- [16](docs/evidence/16-webapp-rules.txt): the rules read from OnlyFans' release of 6 Nov,
+  `202611061539-e69826e739`;
+- [14](docs/evidence/14-live-onlyfans-fetch.txt): the fetch signed with them, through the job, in the
+  CLI and in Horizon (7 Nov);
+- [15](docs/evidence/15-live-probes.txt), section 3: OnlyFans accepting the rules of the release
+  before it, `202611031453-fbc506331f` (4 Nov).
 
 [Changes after the review](#changes-after-the-review) · [Run it](#run-it) ·
 [Data source](#where-the-data-comes-from) · [The failure](#the-failure) ·
@@ -138,7 +141,7 @@ is the revision: of two answers for one profile, the one requested later carries
 Stored: the main fields as columns and the **whole user object (85 fields)** as `jsonb` in
 `profiles.raw`; the captured response is a fixture,
 [`onlyfans-madison420ivy.json`](resources/fixtures/upstream/onlyfans-madison420ivy.json). The same
-fetch through Horizon: `profiles:fetch madison420ivy --queue` → success, HTTP 200, 257 ms
+fetch through Horizon: `profiles:fetch madison420ivy --queue` → success, HTTP 200, 241 ms
 ([14](docs/evidence/14-live-onlyfans-fetch.txt)).
 
 ## The failure
@@ -526,7 +529,8 @@ Claude Code working as an agent; see [AI.md](AI.md).
 | *Afterwards (2 Nov, 00:00–00:30):* read-only public demo mode, hosting it through Tailscale Funnel | 0:30 |
 | *After the review (4 Nov, 01:40–03:05):* direct signed OnlyFans client (signing, rules, sessions), the three fixes with regression tests, live probes and the live check, fake upstream with signature checks and rules rotation, a third independent review and its fixes, evidence, docs, packaging | 1:25 |
 | *Then (4 Nov, 03:10–06:20):* the signing rules read from OnlyFans' own web app code (extractor, synthetic web app and its Node check, live extraction and probe), the fourth and fifth independent reviews (five reviewers) and their fixes, evidence re-recorded at the final code, clean-setup check, docs, packaging | 3:10 |
-| **Total, both rounds** (the public demo not counted) | **7:29** |
+| *Readiness check (6 Nov, 23:50 – 7 Nov, 03:00):* OnlyFans' new release of 6 Nov read (the extractor adjusted to its shape, the synthetic web app and tests extended), the live check repeated on it, evidence, docs, packaging | 3:10 |
+| **Total, both rounds** (the public demo not counted) | **10:39** |
 
 ## Layout
 

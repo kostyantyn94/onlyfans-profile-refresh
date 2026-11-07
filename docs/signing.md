@@ -88,7 +88,8 @@ The extractor refused it (`string array rotation not found`), as it should for a
 not know: nothing was guessed. It now accepts either statement order, reads calls with the key
 first or second, and cuts the helper object out by matching its brackets. Both releases give their
 rules. The 3 Nov release still gives exactly the rules above, and the 6 Nov one gives new ones
-(prefix `67795`, suffix `6aedf4bb`, constant −193; [16](evidence/16-webapp-rules.txt)).
+(prefix `67795`, suffix `6aedf4bb`, constant −193; [16](evidence/16-webapp-rules.txt)). OnlyFans
+accepted them on 7 Nov ([14](evidence/14-live-onlyfans-fetch.txt)).
 
 **Other sources** (`ONLYFANS_RULES_SOURCES`, tried in order) are opt-in: a local JSON file to pin
 rules by hand, or a public rule feed. Feeds publish three different shapes. All three are read and

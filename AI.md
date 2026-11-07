@@ -25,12 +25,14 @@
 ## What was checked, and how
 
 - **Live data from onlyfans.com**: signed guest requests for madison420ivy through the full job
-  path, in the CLI and through Horizon, signed with the rules read from OnlyFans' web app, both
-  HTTP 200 and 612,019 likes, the stored row checked against the 85-field response ([14](docs/evidence/14-live-onlyfans-fetch.txt)). The signature is
+  path, in the CLI and through Horizon, signed with the rules read from OnlyFans' web app (its
+  6 Nov release). Both returned HTTP 200 and 612,132 likes on 7 Nov, and the stored row was checked
+  against the 85-field response ([14](docs/evidence/14-live-onlyfans-fetch.txt)). The signature is
   also checked against fixed values computed separately in Python, and the fake upstream verifies it
   with its own implementation on every workload request.
 - **The signing rules read from OnlyFans' own code**: the extractor's output for the live release
-  ([16](docs/evidence/16-webapp-rules.txt)), accepted by OnlyFans in a separate probe
+  ([16](docs/evidence/16-webapp-rules.txt)), accepted by OnlyFans in the fetch above. The previous
+  release's rules were accepted on 4 Nov in a separate probe
   ([15](docs/evidence/15-live-probes.txt), section 3). The synthetic code the extractor tests use is a
   working program: it runs in Node and signs exactly as its rules say ([docs/signing.md](docs/signing.md)).
 - **Live data (first version, Fans API)**: a real `GET /api/profiles/madison420ivy` through the full
@@ -190,8 +192,9 @@ the extractor refused it: the obfuscator had changed the order of two statements
 wrapper's arguments, and what follows the helper object. Nothing wrong was signed; refreshes would
 have kept the last good rules. A fresh setup, though, has no last good rules, so `profiles:fetch`
 would have failed. The extractor was adjusted to read both shapes, the synthetic web app learned the
-new one, and the live check was repeated on the new release
-([docs/signing.md](docs/signing.md#where-the-rules-come-from-onlyfans-own-web-app)).
+new one, and the live check was repeated on the new release on 7 Nov: HTTP 200 in the CLI and in
+Horizon ([14](docs/evidence/14-live-onlyfans-fetch.txt),
+[docs/signing.md](docs/signing.md#where-the-rules-come-from-onlyfans-own-web-app)).
 
 ## Not verified
 
