@@ -7,13 +7,13 @@ own web app code. Horizon workers keep the profile fresh. The incident from the 
 fixed and measured.
 
 ```text
-$ php artisan profiles:fetch madison420ivy                (live, 7 Nov: docs/evidence/14)
+$ php artisan profiles:fetch madison420ivy                (live, 9 Nov: docs/evidence/14)
 | name                    | Madison Ivy                          |
 | upstream id             | 5140520                              |
-| likes                   | 612,132                              |
+| likes                   | 612,203                              |
 | posts / photos / videos | 178 / 623 / 202                      |
 | fields stored (raw)     | 85                                   |
-| this attempt            | success, HTTP 200, 359 ms            |
+| this attempt            | success, HTTP 200, 332 ms            |
 ```
 
 **How the request is made** (details: [docs/signing.md](docs/signing.md)):
@@ -39,10 +39,10 @@ cached (a fresh setup), the rules OnlyFans last accepted, kept in the repository
 Public rule feeds are an opt-in fallback, off by default.
 
 Checked live:
-- [16](docs/evidence/16-webapp-rules.txt): the rules read from OnlyFans' release of 6 Nov,
-  `202611061539-e69826e739`;
+- [16](docs/evidence/16-webapp-rules.txt): the rules read from OnlyFans' release of 9 Nov,
+  `202611091510-66895e6664`;
 - [14](docs/evidence/14-live-onlyfans-fetch.txt): the fetch signed with them, through the job, in the
-  CLI and in Horizon (7 Nov);
+  CLI and in Horizon (9 Nov);
 - [15](docs/evidence/15-live-probes.txt), section 3: OnlyFans accepting the rules of the release
   before it, `202611031453-fbc506331f` (4 Nov);
 - [17](docs/evidence/17-previous-release-rules.txt): OnlyFans still accepting those 3 Nov rules a day
@@ -116,7 +116,7 @@ refresh is pending. Only tested on Windows 11 with Docker Desktop.
 |---|---|
 | `docker compose exec app php artisan profiles:fetch madison420ivy [--queue]` | fetch from onlyfans.com now in this process, or hand it to Horizon |
 | `docker compose exec app php artisan onlyfans:rules [--reload]` | the signing rules in use, read from OnlyFans' web app (no API request) |
-| `docker compose exec app php artisan test` | 167 tests (Postgres and Redis of their own, never a real upstream) |
+| `docker compose exec app php artisan test` | 168 tests (Postgres and Redis of their own, never a real upstream) |
 | `docker compose exec -e REFRESH_HANDLER=legacy app php artisan test --group=incident` | the incident tests against the **old** handler: 6 of 7 fail |
 | `docker compose exec app php artisan workload:run --handler=legacy` / `--handler=v2` | the workload, before / after |
 | `docker compose exec app php artisan workload:run --rotate-rules=4` | the same, with the signing rules changing 4 s in |
@@ -497,12 +497,13 @@ have been accepted live, they replace those in `resources/onlyfans/last-accepted
   second stack next to the first, with the base URL on the fake upstream so that it made no API
   request to onlyfans.com.
 - **The rules extraction follows the obfuscator's output shape**: a string table, the rotation
-  loop, wrapper functions, a helper object and the checksum as a sum of characters. It reads two
-  real releases, of 3 and 6 Nov, and synthetic code of both shapes, which runs in Node and signs as
-  its rules say. The 6 Nov release changed the shape in three small ways (statement order, argument
-  order, what follows the helper object). The extractor failed loudly on it, as designed, and was
-  adjusted the same day ([docs/signing.md](docs/signing.md)). The next such change will need the
-  same; until then the last good rules stay in use. A digest other than SHA-1 would fail loudly too.
+  loop, wrapper functions, a helper object and the checksum as a sum of characters. It reads three
+  real releases, of 3, 6 and 9 Nov, and synthetic code of all three shapes, which runs in Node and
+  signs as its rules say. Each new release so far changed the shape in small ways (6 Nov: statement
+  order, argument order, what follows the helper object; 9 Nov: constants decoded in place, wrappers
+  passing the key first). Each time the extractor failed loudly, as designed, the last good rules
+  stayed in use, and it was adjusted the same day ([docs/signing.md](docs/signing.md)). The next
+  such change will need the same. A digest other than SHA-1 would fail loudly too.
 - **How long OnlyFans accepts an earlier release's rules is unknown.** On 4 Nov it accepted at least
   one earlier set; on 7 Nov, a day after the 6 Nov release, it still accepted the 3 Nov rules
   ([17](docs/evidence/17-previous-release-rules.txt)). The fallback to the rules kept in the
@@ -569,7 +570,7 @@ app/Console/        profiles:fetch|enqueue-due|repair, onlyfans:rules,
 fake-upstream/      stand-in for OnlyFans' api2 (checks signatures, can rotate its rules)
 resources/fixtures/ upstream response fixtures, incl. real madison420ivy responses, made-up signing rules
 resources/onlyfans/ the signing rules OnlyFans last accepted: the last default source
-tests/              167 PHPUnit tests; Support/SyntheticWebApp builds obfuscated signing code from
+tests/              168 PHPUnit tests; Support/SyntheticWebApp builds obfuscated signing code from
                     made-up rules (no OnlyFans code is in the repository)
 docs/               signing.md, scaling.md; evidence/ (tests, workload, crash, throughput, memory, clean setup, live fetches)
 ```

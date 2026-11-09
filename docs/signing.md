@@ -88,8 +88,24 @@ The extractor refused it (`string array rotation not found`), as it should for a
 not know: nothing was guessed. It now accepts either statement order, reads calls with the key
 first or second, and cuts the helper object out by matching its brackets. Both releases give their
 rules. The 3 Nov release still gives exactly the rules above, and the 6 Nov one gives new ones
-(prefix `67795`, suffix `6aedf4bb`, constant −193; [16](evidence/16-webapp-rules.txt)). OnlyFans
-accepted them on 7 Nov ([14](evidence/14-live-onlyfans-fetch.txt)).
+(prefix `67795`, suffix `6aedf4bb`, constant −193). OnlyFans accepted them on 7 Nov. Evidence 16
+and 14 were recorded again on the 9 Nov release; their 6 Nov versions are in the history (e.g. at
+commit `719ffc7`).
+
+**Another release on 9 Nov** (`202611091510-66895e6664`). The same program again, with three
+more differences:
+- the static param and the prefix are decoded in place, `a("DAaJ",1422)`, instead of being read
+  from the helper object, `n[r(-71,"dvN3")]` (the suffix still is);
+- a wrapper can pass the key first to the function it calls: `function o(W,n){return a(W,n- -1777)}`;
+- the signing function's own wrapper is declared after the signed message (function declarations
+  are hoisted).
+
+The extractor refused it (`signed message not found`), and the 6 Nov rules kept in the repository
+were used, with a warning. It now accepts a constant in either form and a wrapper's call in either
+argument order. The 3 and 6 Nov releases still give the same rules, and the 9 Nov one gives new
+ones (prefix `67935`, suffix `6af1e268`, constant 550; [16](evidence/16-webapp-rules.txt)).
+OnlyFans accepted them the same day ([14](evidence/14-live-onlyfans-fetch.txt)), and they replaced
+the 6 Nov rules in `last-accepted-rules.json`.
 
 **When the code cannot be read.** Refreshes keep signing with the last good rules, and OnlyFans may
 accept them for a while: on 4 Nov it accepted an earlier release's rules, and on 7 Nov, a day after
@@ -111,7 +127,7 @@ Running the signing module (in Node, or a JavaScript engine inside PHP) would su
 the obfuscator's output: the module computes the signature whatever its shape. It is not done here
 because it means running code downloaded from a third party on the machines that hold the sessions.
 Reading the code as text has the opposite trade-off: nothing downloaded runs, but a new shape needs
-the extractor adjusted, as on 6 Nov.
+the extractor adjusted, as on 6 and 9 Nov.
 
 In production I would use both. A throwaway sandbox (a container with no network, no secrets, and
 limits on CPU, memory and time) runs each new release's module once, for a fixed path, time and
@@ -127,7 +143,7 @@ obfuscated signing module of the same shape from made-up rules. The module has:
 - RC4-encrypted strings in the custom base64;
 - an array rotated by 0, 1, 5 or 17 positions;
 - wrappers that shift indexes, and helpers that mix operators;
-- either the 3 Nov or the 6 Nov shape.
+- the 3 Nov, 6 Nov or 9 Nov shape.
 
 [`WebAppRulesExtractorTest`](../tests/Unit/WebAppRulesExtractorTest.php) recovers the rules from it,
 and refuses variants it must not guess at.
@@ -138,10 +154,11 @@ runtime and checks that it signs a request exactly as its rules say:
 
 ```text
 $ docker compose exec -T app php tests/Support/synthetic-web-app-in-node.php | node tests/Support/synthetic-web-app-in-node.mjs
-rotation 0: signs as its rules say (13579:dd465749cbd614564bc0444105ef79232112990e:1b3:2468aceb)
-rotation 1: signs as its rules say (13579:111ef65939a56eff7b6f19bc50c60229ee9bd9c2:30b:2468aceb)
-rotation 17: signs as its rules say (13579:e09f2171ed43df57ba113ec0783bf7c2685a205e:2d1:2468aceb)
-rotation 5, later shape: signs as its rules say (13579:4d547f7a8e4237db48d1578bc628df90d8ff585e:28c:2468aceb)
+rotation 0, 3 Nov shape: signs as its rules say (13579:2deed734124e211f28c24fee9a977d87188948f3:26d:2468aceb)
+rotation 1, 3 Nov shape: signs as its rules say (13579:ba61c1c57b448fad3c8f56f28a39d5ae95b552d9:314:2468aceb)
+rotation 17, 3 Nov shape: signs as its rules say (13579:ad707d77ca2cca555601c1b5bbec0fd5ec114b5c:3d0:2468aceb)
+rotation 5, 6 Nov shape: signs as its rules say (13579:988f845570538f73d6980b5e23e0f703bbd3d458:21a:2468aceb)
+rotation 2, 9 Nov shape: signs as its rules say (13579:d4974d593e987639eae1e8ca76b057550abd2a00:235:2468aceb)
 ```
 
 The checks against the real code are the live ones: each release read live

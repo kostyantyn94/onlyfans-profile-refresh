@@ -1,5 +1,5 @@
 # Live: signed guest requests to onlyfans.com/api2/v2/users/madison420ivy.
-# Commit: e12d480 Full test suite re-recorded at the final code (178 tests)   Run: 2026-11-07T00:37Z
+# Commit: f62a138 Evidence 16: the rules read live from OnlyFans' 9 Nov release   Run: 2026-11-09T17:15Z
 
 $ php artisan db:seed --force
 
@@ -7,19 +7,19 @@ $ php artisan db:seed --force
 
 
 $ php artisan onlyfans:rules --reload        # the rules the requests below are signed with
-+---------------------+----------------------------------------------------------------------------------------------------------------+
-| Field               | Value                                                                                                          |
-+---------------------+----------------------------------------------------------------------------------------------------------------+
-| upstream            | https://onlyfans.com                                                                                           |
-| source              | webapp:https://onlyfans.com/                                                                                   |
-| web app release     | 202611061539-e69826e739                                                                                        |
-| rules (fingerprint) | 55a00e0a2497                                                                                                   |
-| sign                | 67795:<sha1>:<checksum, hex>:6aedf4bb                                                                          |
-| static param        | nCPoqEMsVhbBb9WC8VvanfVy0UcIaCS8                                                                               |
-| checksum            | sha1 characters at 1,2,3,3,4,6,7,7,8,10,11,11,12,13,14,16,18,19,22,23,24,30,30,32,34,34,34,35,36,37,37,39 -193 |
-| app-token           | 33d57ade8c02dbc5a333db99ff9ae26a                                                                               |
-| headers left out    | -                                                                                                              |
-+---------------------+----------------------------------------------------------------------------------------------------------------+
++---------------------+---------------------------------------------------------------------------------------------------------------+
+| Field               | Value                                                                                                         |
++---------------------+---------------------------------------------------------------------------------------------------------------+
+| upstream            | https://onlyfans.com                                                                                          |
+| source              | webapp:https://onlyfans.com/                                                                                  |
+| web app release     | 202611091510-66895e6664                                                                                       |
+| rules (fingerprint) | f566510cabf9                                                                                                  |
+| sign                | 67935:<sha1>:<checksum, hex>:6af1e268                                                                         |
+| static param        | F3I5un32SfLFI1jmV3h6ILZFxKdADcBN                                                                              |
+| checksum            | sha1 characters at 2,4,6,6,6,6,6,8,9,9,10,11,12,13,13,13,17,18,19,19,23,25,27,31,33,34,35,35,36,38,39,39 +550 |
+| app-token           | 33d57ade8c02dbc5a333db99ff9ae26a                                                                              |
+| headers left out    | -                                                                                                             |
++---------------------+---------------------------------------------------------------------------------------------------------------+
 
 $ php artisan profiles:fetch madison420ivy          # first attempt in this process
 +-------------------------+--------------------------------------+
@@ -28,41 +28,41 @@ $ php artisan profiles:fetch madison420ivy          # first attempt in this proc
 | username                | madison420ivy                        |
 | name                    | Madison Ivy                          |
 | upstream id             | 5140520                              |
-| likes                   | 612,132                              |
+| likes                   | 612,203                              |
 | posts / photos / videos | 178 / 623 / 202                      |
 | verified                | true                                 |
 | subscribe price         | 0.00                                 |
 | joined                  | 2018-11-11                           |
-| revision                | 1794011876407                        |
+| revision                | 1794244550353                        |
 | fields stored (raw)     | 85                                   |
-| last attempt            | success at 2026-11-07 00:37:56       |
-| last success            | 2026-11-07 00:37:56                  |
+| last attempt            | success at 2026-11-09 17:15:50       |
+| last success            | 2026-11-09 17:15:50                  |
 | last failure            | -                                    |
-| next refresh            | 2026-11-08 00:37:56                  |
-| this attempt            | success, HTTP 200, 359 ms            |
-| refresh id              | 368350fd-04be-48eb-acc7-831e1002b07d |
+| next refresh            | 2026-11-10 17:15:50                  |
+| this attempt            | success, HTTP 200, 332 ms            |
+| refresh id              | 6183a259-01ed-4480-8aaa-5a47999aedb4 |
 +-------------------------+--------------------------------------+
 
 $ php artisan profiles:fetch madison420ivy --queue  # the same through Horizon
-Queued refresh 8fc55f33-e73d-4eb7-87e4-34827ba609bc for madison420ivy. Follow it: grep 8fc55f33-e73d-4eb7-87e4-34827ba609bc storage/logs/refresh.log
+Queued refresh 58f52efc-3e40-4811-a2c0-dcfa74b2e70d for madison420ivy. Follow it: grep 58f52efc-3e40-4811-a2c0-dcfa74b2e70d storage/logs/refresh.log
 
 # refresh_attempts of the onlyfans account (newest first):
      created_at      | handler | outcome | http_status | likes  | duration_ms 
 ---------------------+---------+---------+-------------+--------+-------------
+ 2026-11-09 17:15:51 | v2      | success |         200 | 612203 |         237
+ 2026-11-09 17:15:50 | v2      | success |         200 | 612203 |         332
  2026-11-07 00:37:57 | v2      | success |         200 | 612132 |         241
  2026-11-07 00:37:56 | v2      | success |         200 | 612132 |         359
  2026-11-07 00:09:04 | v2      | success |         200 | 612132 |         254
- 2026-11-07 00:09:02 | v2      | success |         200 | 612132 |         341
- 2026-11-04 04:07:38 | v2      | success |         200 | 612019 |         257
 (5 rows)
 
 # stored profile:
    username    | upstream_id |    name     | likes_count | posts_count | photos_count | videos_count | raw_fields | last_attempt_status |   next_refresh_at   
 ---------------+-------------+-------------+-------------+-------------+--------------+--------------+------------+---------------------+---------------------
- madison420ivy |     5140520 | Madison Ivy |      612132 |         178 |          623 |          202 |         85 | success             | 2026-11-08 00:37:57
+ madison420ivy |     5140520 | Madison Ivy |      612203 |         178 |          623 |          202 |         85 | success             | 2026-11-10 17:15:51
 (1 row)
 
 # signing and refresh events of the onlyfans account in storage/logs/refresh.log during this run (secrets are never logged):
-{"message":"onlyfans.rules_loaded","context":{"host":"onlyfans.com","rules_source":"webapp:https://onlyfans.com/","rules":"55a00e0a2497","release":"202611061539-e69826e739","passed_over":[],"rejected_recently":false},"level":200,"level_name":"INFO","channel":"local","datetime":"2026-11-07T00:37:55.767603+00:00","extra":{}}
-{"message":"refresh.success","context":{"refresh_id":"368350fd-04be-48eb-acc7-831e1002b07d","account_id":32,"account":"onlyfans","profile_id":66461,"username":"madison420ivy","job_id":"","job_attempt":1,"upstream_attempt":1,"outcome":"success","http_status":200,"format":"onlyfans","revision":1794011876407,"likes":612132,"duration_ms":359,"memory_peak_mb":36.5},"level":200,"level_name":"INFO","chan
-{"message":"refresh.success","context":{"refresh_id":"8fc55f33-e73d-4eb7-87e4-34827ba609bc","account_id":32,"account":"onlyfans","profile_id":66461,"username":"madison420ivy","job_id":"3a40e15d-4360-43d4-9fd4-87ab022ef276","job_attempt":1,"upstream_attempt":1,"outcome":"success","http_status":200,"format":"onlyfans","revision":1794011877557,"likes":612132,"duration_ms":241,"memory_peak_mb":36.5},"
+{"message":"onlyfans.rules_loaded","context":{"host":"onlyfans.com","rules_source":"webapp:https://onlyfans.com/","rules":"f566510cabf9","release":"202611091510-66895e6664","passed_over":[],"rejected_recently":false},"level":200,"level_name":"INFO","channel":"local","datetime":"2026-11-09T17:15:49.816702+00:00","extra":{}}
+{"message":"refresh.success","context":{"refresh_id":"6183a259-01ed-4480-8aaa-5a47999aedb4","account_id":32,"account":"onlyfans","profile_id":66461,"username":"madison420ivy","job_id":"","job_attempt":1,"upstream_attempt":1,"outcome":"success","http_status":200,"format":"onlyfans","revision":1794244550353,"likes":612203,"duration_ms":332,"memory_peak_mb":36.5},"level":200,"level_name":"INFO","chan
+{"message":"refresh.success","context":{"refresh_id":"58f52efc-3e40-4811-a2c0-dcfa74b2e70d","account_id":32,"account":"onlyfans","profile_id":66461,"username":"madison420ivy","job_id":"3e7fb28f-1f86-4f5d-8d7c-2b5c323faeaf","job_attempt":1,"upstream_attempt":1,"outcome":"success","http_status":200,"format":"onlyfans","revision":1794244551640,"likes":612203,"duration_ms":237,"memory_peak_mb":36.5},"

@@ -26,7 +26,7 @@
 
 - **Live data from onlyfans.com**: signed guest requests for madison420ivy through the full job
   path, in the CLI and through Horizon, signed with the rules read from OnlyFans' web app (its
-  6 Nov release). Both returned HTTP 200 and 612,132 likes on 7 Nov, and the stored row was checked
+  9 Nov release). Both returned HTTP 200 and 612,203 likes on 9 Nov, and the stored row was checked
   against the 85-field response ([14](docs/evidence/14-live-onlyfans-fetch.txt)). The signature is
   also checked against fixed values computed separately in Python, and the fake upstream verifies it
   with its own implementation on every workload request.
@@ -49,8 +49,9 @@
   waiting for the real `retry_after` redelivery.
 - **Secrets**: a test and every workload run search the logs for the API keys and every session
   token the fake upstream saw (0 found); a local pre-commit hook (not part of the repository)
-  refuses `.env` and anything that looks like an `ofapi_` key. The
-  submission ZIP is built from a fresh clone, so the local `.env` with the key is not in it.
+  refuses `.env` and anything that looks like an `ofapi_` key. Before the repository was
+  published, every file of every commit was checked for keys, session cookies and tokens (none;
+  `.env` was never committed).
 - **Clean setup**: a fresh clone in an empty folder at the final code, `setup.sh`, then the test
   suite, the rules read from OnlyFans' web app and the UI: [10](docs/evidence/10-clean-setup.txt).
 
@@ -200,6 +201,17 @@ comparison", and its account still showed in the demo. I had it removed: the cli
 and `?fresh=true` follow-up, its settings, its fixture and the 12 tests that covered them. A
 migration deletes `fansapi` accounts from existing databases. Requests go to onlyfans.com only.
 
+**Another new release (9 Nov).** Before the repository was published, the readiness check was
+repeated: OnlyFans had shipped a release that afternoon, and the extractor refused it (`signed
+message not found`). The 6 Nov rules kept in the repository were used, with a warning, as designed.
+The obfuscator's output had changed in three more ways: the static param and the prefix decoded in
+place instead of read from the helper object, a wrapper passing the key first to the function it
+calls, and the signing function's wrapper declared later. The extractor now accepts both forms of
+each; the synthetic web app learned the 9 Nov shape, and its test fails on the previous extractor
+with the same error as the real release. The live check was repeated on the new rules the same day:
+HTTP 200 in the CLI and in Horizon ([14](docs/evidence/14-live-onlyfans-fetch.txt)). They replaced
+the 6 Nov rules kept in the repository.
+
 ## Not verified
 
 - That `favoritedCount` is the "likes" number OnlyFans shows on the profile page: it is the field
@@ -207,8 +219,8 @@ migration deletes `fansapi` accounts from existing databases. Requests go to onl
 - How long a guest session stays valid, and how many requests OnlyFans allows per session or per
   IP before it throttles: only a handful of live requests were made. 429 and 5xx from OnlyFans were
   never seen live; their handling is tested against fakes.
-- That the rules extraction keeps working across OnlyFans releases. It reads the releases of 3 and
-  6 Nov, and the second one already needed three small adjustments. The next change of shape will
+- That the rules extraction keeps working across OnlyFans releases. It reads the releases of 3, 6
+  and 9 Nov, and each of the last two needed three small adjustments. The next change of shape will
   make it fail loudly again; the last good rules (on a fresh setup, those kept in the repository)
   stay in use until it is adjusted, for as long as OnlyFans accepts them.
 - How long OnlyFans keeps accepting an earlier release's rules. On 4 Nov it accepted the rafa-9
