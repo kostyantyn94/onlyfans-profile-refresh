@@ -552,7 +552,8 @@ Claude Code working as an agent; see [AI.md](AI.md).
 | *Then (4 Nov, 03:10–06:20):* the signing rules read from OnlyFans' own web app code (extractor, synthetic web app and its Node check, live extraction and probe), the fourth and fifth independent reviews (five reviewers) and their fixes, evidence re-recorded at the final code, clean-setup check, docs, packaging | 3:10 |
 | *Readiness check (6–7 Nov: 23:50–00:05, 02:37–02:42, 06:04–06:14, 07:51–08:00):* OnlyFans' new release of 6 Nov read (the extractor adjusted to its shape, the synthetic web app and tests extended), the live check repeated on it, the rules OnlyFans last accepted kept as the last source and checked live, evidence, docs, packaging | 0:39 |
 | *8 Nov, 01:15–01:35:* the Fans API client removed (client, cache rule, settings, fixture, its tests; a migration for existing databases), docs, evidence, packaging | 0:20 |
-| **Total, both rounds** (the public demo not counted) | **8:28** |
+| *9 Nov, 18:59–19:25, before publishing on GitHub:* OnlyFans' new release of 9 Nov read (the extractor adjusted to its shape, the synthetic web app and tests extended), the live check repeated on it and its rules kept in the repository, the whole history checked for secrets, evidence, docs | 0:26 |
+| **Total, both rounds** (the public demo not counted) | **8:54** |
 
 ## Layout
 

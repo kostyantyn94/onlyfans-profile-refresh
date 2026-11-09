@@ -1,5 +1,5 @@
 # Clean setup check: a fresh clone in an empty folder, no vendor, Windows 11 + Docker Desktop.
-# Commit: 826b2c5 Remove the Fans API client: requests go to onlyfans.com only   Run: 2026-11-07T23:25Z
+# Commit: a76c9b0 Evidence 08: the full test suite at the 9 Nov code (168 tests)   Run: 2026-11-09T17:18Z
 # .env is .env.example plus three lines, so this stack runs next to the main one and
 # makes no request to onlyfans.com's API: COMPOSE_PROJECT_NAME=fansapi-clean, APP_PORT=8001,
 # ONLYFANS_BASE_URL=http://fake-upstream:8080/clean.
@@ -13,18 +13,18 @@ Use the `composer fund` command to find out more!
 
    INFO  Preparing database.  
 
-  Creating migration table ....................................... 5.25ms DONE
+  Creating migration table ....................................... 6.13ms DONE
 
    INFO  Running migrations.  
 
-  0001_01_01_000000_create_users_table ........................... 7.75ms DONE
-  0001_01_01_000001_create_cache_table ........................... 4.89ms DONE
-  0001_01_01_000002_create_jobs_table ............................ 8.30ms DONE
-  2026_11_01_000100_create_accounts_table ........................ 3.04ms DONE
-  2026_11_01_000200_create_profiles_table ........................ 9.04ms DONE
-  2026_11_01_000300_create_refresh_attempts_table ................ 8.05ms DONE
-  2026_11_04_000100_add_driver_to_accounts_table ................. 1.73ms DONE
-  2026_11_08_000100_remove_the_fans_api_driver ................... 1.11ms DONE
+  0001_01_01_000000_create_users_table ........................... 7.90ms DONE
+  0001_01_01_000001_create_cache_table ........................... 5.19ms DONE
+  0001_01_01_000002_create_jobs_table ............................ 8.41ms DONE
+  2026_11_01_000100_create_accounts_table ........................ 3.75ms DONE
+  2026_11_01_000200_create_profiles_table ........................ 8.98ms DONE
+  2026_11_01_000300_create_refresh_attempts_table ................ 8.19ms DONE
+  2026_11_04_000100_add_driver_to_accounts_table ................. 2.14ms DONE
+  2026_11_08_000100_remove_the_fans_api_driver ................... 1.35ms DONE
 
 
    INFO  Seeding database.  
@@ -42,14 +42,14 @@ $ docker compose exec postgres psql -U app -d profiles -c "select slug, driver f
 
 $ docker compose exec app php artisan test
 
-  Tests:    167 passed (4559 assertions)
-  Duration: 19.15s
+  Tests:    168 passed (4565 assertions)
+  Duration: 20.23s
 
 
 $ docker compose exec app php artisan onlyfans:rules --base-url=https://onlyfans.com   # public page and scripts only
-| source              | webapp:https://onlyfans.com/                                                                                   |
-| web app release     | 202611061539-e69826e739                                                                                        |
-| rules (fingerprint) | 55a00e0a2497                                                                                                   |
+| source              | webapp:https://onlyfans.com/                                                                                  |
+| web app release     | 202611091510-66895e6664                                                                                       |
+| rules (fingerprint) | f566510cabf9                                                                                                  |
 
 $ curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8001/
 200
