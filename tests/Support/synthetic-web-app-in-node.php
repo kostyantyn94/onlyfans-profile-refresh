@@ -20,7 +20,7 @@ $rules = [
     'checksum_constant' => -1517,
 ];
 
-foreach ([[0, false], [1, false], [17, false], [5, true]] as [$rotation, $laterShape]) {
-    $chunk = (new SyntheticWebApp($rules, $rotation, laterShape: $laterShape))->chunk();
-    echo json_encode(['rotation' => $rotation.($laterShape ? ', later shape' : ''), 'rules' => $rules, 'chunk' => $chunk]), "\n";
+foreach ([[0, '3 Nov'], [1, '3 Nov'], [17, '3 Nov'], [5, '6 Nov'], [2, '9 Nov']] as [$rotation, $shape]) {
+    $chunk = (new SyntheticWebApp($rules, $rotation, shape: $shape))->chunk();
+    echo json_encode(['rotation' => $rotation.', '.$shape.' shape', 'rules' => $rules, 'chunk' => $chunk]), "\n";
 }

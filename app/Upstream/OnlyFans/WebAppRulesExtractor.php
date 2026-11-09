@@ -34,15 +34,23 @@ class WebAppRulesExtractor
     // the function's name and the argument list.
     private const CALL = '(\w+)\((-?\d+,"(?:[^"\\\\]|\\\\.)*"|"(?:[^"\\\\]|\\\\.)*",-?\d+)\)';
 
+    // The same call, without groups.
+    private const CALL_TEXT = '\w+\((?:-?\d+,"(?:[^"\\\\]|\\\\.)*"|"(?:[^"\\\\]|\\\\.)*",-?\d+)\)';
+
+    // A wrapper that shifts the index on the way to the decoder or to another
+    // wrapper: function o(W,n){return i(n- -194,W)}, or with the key first in the
+    // call it makes (9 Nov 2026): function o(W,n){return a(W,n- -1777)}.
+    private const WRAPPER = 'function \w+\(\w+,\w+\)\{return \w+\((?:\w+\s*-\s*-?\s*\d+,\w+|\w+,\w+\s*-\s*-?\s*\d+)\)\}';
+
     /** @var list<string> the string array, rotated into place */
     private array $strings = [];
 
     private int $offset = 0;
 
     /**
-     * Wrapper functions in scope, name => [target, index argument (0|1), added to the index, key argument (0|1)].
+     * Wrapper functions in scope, name => [target, index argument (0|1), added to the index, key argument (0|1), passes the key first].
      *
-     * @var array<string, array{0: string, 1: int, 2: int, 3: int}>
+     * @var array<string, array{0: string, 1: int, 2: int, 3: int, 4: bool}>
      */
     private array $wrappers = [];
 
@@ -75,8 +83,9 @@ class WebAppRulesExtractor
         $open = $m[0][1] + strlen($m[0][0]) - 1;
         $opsSource = $this->braced($chunk, $open);
 
-        // The function's own wrapper is the first one defined after the helper object.
-        if (! preg_match('/function \w+\(\w+,\w+\)\{return \w+\(\w+\s*-\s*-?\s*\d+,\w+\)\}/', $chunk, $w, 0, $open + strlen($opsSource) + 2)) {
+        // The function's own wrapper is the first one defined after the helper object
+        // (on 9 Nov 2026 only after the signed message: function declarations are hoisted).
+        if (! preg_match('/'.self::WRAPPER.'/', $chunk, $w, 0, $open + strlen($opsSource) + 2)) {
             throw new InvalidSigningRules('signing function not found');
         }
 
@@ -85,22 +94,26 @@ class WebAppRulesExtractor
         $ops = $this->opsObject($opsSource);
         $body = substr($chunk, $m[0][1]);
 
+        // A constant: the helper object's entry n[o(..)], or the decoded string o(..) itself
+        // (the static param and the prefix on 9 Nov 2026).
+        $value = '((?:'.preg_quote($opsName, '/').'\['.self::CALL_TEXT.'\]|'.self::CALL_TEXT.'))';
+
         // [n[o(..)], r[o(..)], t, e||0][o(..)]("\n"): static_param, time, path, user id.
         $call = self::CALL;
-        if (! preg_match('/\['.preg_quote($opsName, '/').'\['.$call.'\],\w+\['.$call.'\],\w+,\w+\|\|0\]\['.$call.'\]\("\\\\n"\)/', $body, $s)) {
+        if (! preg_match('/\['.$value.',\w+\['.$call.'\],\w+,\w+\|\|0\]\['.$call.'\]\("\\\\n"\)/', $body, $s)) {
             throw new InvalidSigningRules('signed message not found');
         }
 
-        $staticParam = $ops[$this->callLiteral($s[1], $s[2])] ?? null;
+        $staticParam = $this->constant($s[1], $opsName, $ops);
 
         // =[n[o(..)],k,function(W){...}(k),n[o(..)]][o(..)](":"): prefix, sha1, checksum, suffix.
-        if (! preg_match('/=\['.preg_quote($opsName, '/').'\['.$call.'\],(\w+),function\((\w+)\)\{(.*?)\}\(\3\),'.preg_quote($opsName, '/').'\['.$call.'\]\]\['.$call.'\]\(":"\)/s', $body, $g)) {
+        if (! preg_match('/=\['.$value.',(\w+),function\((\w+)\)\{(.*?)\}\(\2\),'.$value.'\]\['.$call.'\]\(":"\)/s', $body, $g)) {
             throw new InvalidSigningRules('signature assembly not found');
         }
 
-        $prefix = $ops[$this->callLiteral($g[1], $g[2])] ?? null;
-        $suffix = $ops[$this->callLiteral($g[6], $g[7])] ?? null;
-        [$indexes, $constant] = $this->checksum($g[5], $g[4], $opsName, $ops);
+        $prefix = $this->constant($g[1], $opsName, $ops);
+        $suffix = $this->constant($g[5], $opsName, $ops);
+        [$indexes, $constant] = $this->checksum($g[4], $g[3], $opsName, $ops);
 
         return SigningRules::fromArray([
             'static_param' => $staticParam,
@@ -144,7 +157,7 @@ class WebAppRulesExtractor
     {
         // The wrapper and "const t=W()" come in either order (the obfuscator swapped
         // them between the releases of 3 and 6 Nov 2026).
-        $wrapper = 'function \w+\(\w+,\w+\)\{return \w+\(\w+\s*-\s*-?\s*\d+,\w+\)\}';
+        $wrapper = self::WRAPPER;
         $pattern = '/!function\(\w+,\w+\)\{(?:(?<before>'.$wrapper.')const \w+=\w+\(\);|const \w+=\w+\(\);(?<after>'.$wrapper.'))'
             .'for\(;;\)try\{const \w+=void 0;if\((?<check>.+?)===\w+\)break;\w+\.push\(\w+\.shift\(\)\)\}catch\(\w+\)\{\w+\.push\(\w+\.shift\(\)\)\}\}\(\w+,(?<target>\d+)\)/s';
 
@@ -176,24 +189,34 @@ class WebAppRulesExtractor
         throw new InvalidSigningRules('no rotation of the string array matches its checksum');
     }
 
-    /** "function o(W,n){return i(n- -194,W)}" → o(a, b) = i(b + 194, a). */
+    /**
+     * "function o(W,n){return i(n- -194,W)}" → o(a, b) = i(b + 194, a);
+     * "function o(W,n){return a(W,n- -1777)}" → o(a, b) = a(a, b + 1777).
+     */
     private function defineWrapper(string $definition): void
     {
-        if (! preg_match('/^function (\w+)\((\w+),(\w+)\)\{return (\w+)\((\w+)\s*-\s*(-?)\s*(\d+),(\w+)\)\}$/', $definition, $m)) {
+        $index = '(\w+)\s*-\s*(-?)\s*(\d+)';
+
+        if (preg_match('/^function (\w+)\((\w+),(\w+)\)\{return (\w+)\('.$index.',(\w+)\)\}$/', $definition, $m)) {
+            [, $name, $first, , $target, $indexArg, $minus, $amount, $keyArg] = $m;
+            $keyFirst = false;
+        } elseif (preg_match('/^function (\w+)\((\w+),(\w+)\)\{return (\w+)\((\w+),'.$index.'\)\}$/', $definition, $m)) {
+            [, $name, $first, , $target, $keyArg, $indexArg, $minus, $amount] = $m;
+            $keyFirst = true;
+        } else {
             throw new InvalidSigningRules('unexpected wrapper: '.substr($definition, 0, 60));
         }
 
-        [, $name, $first, , $target, $indexArg, $minus, $amount, $keyArg] = $m;
-
-        $this->wrappers[$name] = [$target, $indexArg === $first ? 0 : 1, $minus === '-' ? (int) $amount : -(int) $amount, $keyArg === $first ? 0 : 1];
+        $this->wrappers[$name] = [$target, $indexArg === $first ? 0 : 1, $minus === '-' ? (int) $amount : -(int) $amount, $keyArg === $first ? 0 : 1, $keyFirst];
     }
 
     /** Call a wrapper or the decoder with literal arguments: returns the decoded string. */
     private function call(string $name, int|string ...$args): string
     {
         for ($depth = 0; $depth < 10 && isset($this->wrappers[$name]); $depth++) {
-            [$target, $indexAt, $add, $keyAt] = $this->wrappers[$name];
-            $args = [(int) $args[$indexAt] + $add, (string) $args[$keyAt]];
+            [$target, $indexAt, $add, $keyAt, $keyFirst] = $this->wrappers[$name];
+            $index = (int) $args[$indexAt] + $add;
+            $args = $keyFirst ? [(string) $args[$keyAt], $index] : [$index, (string) $args[$keyAt]];
             $name = $target;
         }
 
@@ -295,9 +318,9 @@ class WebAppRulesExtractor
     private function checksum(string $body, string $digest, string $opsName, array $ops): array
     {
         // return Math[t(..)](EXPRESSION)[t(..)](16): Math.abs(...).toString(16)
-        $call = '\w+\((?:-?\d+,"(?:[^"\\\\]|\\\\.)*"|"(?:[^"\\\\]|\\\\.)*",-?\d+)\)';
+        $call = self::CALL_TEXT;
 
-        if (! preg_match('/^(function \w+\(\w+,\w+\)\{return \w+\(\w+\s*-\s*-?\s*\d+,\w+\)\})return (\w+)\[('.$call.')\]\((.+)\)\[('.$call.')\]\(16\)$/s', $body, $m)) {
+        if (! preg_match('/^('.self::WRAPPER.')return (\w+)\[('.$call.')\]\((.+)\)\[('.$call.')\]\(16\)$/s', $body, $m)) {
             throw new InvalidSigningRules('checksum function not understood');
         }
 
@@ -357,6 +380,20 @@ class WebAppRulesExtractor
         }
 
         throw new InvalidSigningRules('unbalanced brackets in the signing function');
+    }
+
+    /**
+     * A constant matched as n[o(..)] (the helper object's entry) or o(..) (the decoded string).
+     *
+     * @param  array<string, string>  $ops
+     */
+    private function constant(string $expression, string $opsName, array $ops): ?string
+    {
+        if (preg_match('/^'.preg_quote($opsName, '/').'\['.self::CALL.'\]$/', $expression, $m)) {
+            return $ops[$this->callLiteral($m[1], $m[2])] ?? null;
+        }
+
+        return preg_match('/^'.self::CALL.'$/', $expression, $m) ? $this->callLiteral($m[1], $m[2]) : null;
     }
 
     /** A call matched by CALL: its literal arguments, in source order, passed to call(). */

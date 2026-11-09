@@ -28,12 +28,16 @@ final class SyntheticWebApp
 
     /**
      * @param  array{static_param: string, prefix: string, suffix: string, checksum_indexes: list<int>, checksum_constant: int}  $rules
-     * @param  bool  $laterShape  the obfuscator's output as of OnlyFans' 6 Nov 2026 release: in the
-     *                            rotation loop the wrapper comes after "const t=W()"; the helper
-     *                            object is followed by more declarations before the signing
-     *                            function's wrapper; the checksum's wrapper takes the key first
+     * @param  string  $shape  the obfuscator's output as of OnlyFans' release of 3, 6 or 9 Nov 2026.
+     *                         6 Nov: in the rotation loop the wrapper comes after "const t=W()"; the
+     *                         helper object is followed by more declarations before the signing
+     *                         function's wrapper; the checksum's wrapper takes the key first.
+     *                         9 Nov: the rotation loop's wrapper takes the index first; the signing
+     *                         function's wrapper takes the key first and is declared after the signed
+     *                         message; the static param and the prefix are decoded in place, not
+     *                         helper object entries; the checksum's wrapper passes the key first.
      */
-    public function __construct(private array $rules, private int $rotation = 3, private bool $subtractACharacter = false, private bool $laterShape = false) {}
+    public function __construct(private array $rules, private int $rotation = 3, private bool $subtractACharacter = false, private string $shape = '3 Nov') {}
 
     public function page(): string
     {
@@ -67,9 +71,10 @@ final class SyntheticWebApp
 
         // Wrappers: in the rotation loop o(key, n) = i(n + 100, key); in the
         // signing function o(n, key) = i(n + 500, key); in the checksum t(n, key) = o(n - 50, key),
-        // or t(key, n) in the later shape.
-        $sign = fn (string $s) => $this->wrap($s, 500, 'o');
-        $check = fn (string $s) => $this->wrap($s, 450, 't', keyFirst: $this->laterShape);
+        // or t(key, n) since 6 Nov. On 9 Nov the rotation loop's o(n, key) and the signing function's o(key, n).
+        $nov9 = $this->shape === '9 Nov';
+        $sign = fn (string $s) => $this->wrap($s, 500, 'o', keyFirst: $nov9);
+        $check = fn (string $s) => $this->wrap($s, 450, 't', keyFirst: $this->shape !== '3 Nov');
 
         $terms = [];
         $constants = $this->splitConstant(count($r['checksum_indexes']), $r['checksum_constant']);
@@ -104,32 +109,45 @@ final class SyntheticWebApp
             $mod.':function(W,n){return W%n}',
             $plus2.':function(W,n){return W+n}',
             $call3.':function(W,n,o,t){return W(n,o,t)}',
-            $staticKey.':'.$sign($r['static_param']),
-            $prefixKey.':'.$sign($r['prefix']),
+            ...($nov9 ? [] : [$staticKey.':'.$sign($r['static_param']), $prefixKey.':'.$sign($r['prefix'])]),
             $suffixKey.':'.$sign($r['suffix']),
         ]);
 
-        $wrapper = 'function o(W,n){return i(W- -500,n)}';
+        $wrapper = $nov9 ? 'function o(W,n){return i(n- -500,W)}' : 'function o(W,n){return i(W- -500,n)}';
         $path = 't=n['.$sign($call3).'](u(),W,'.$sign('url').',""),r={};';
-        $signing = 'n.A=W=>{const n={'.$ops.'}'
-            .($this->laterShape ? ','.$path.$wrapper : ';'.$wrapper.'const '.$path)
+        $afterOps = match ($this->shape) {
+            '3 Nov' => ';'.$wrapper.'const '.$path,
+            '6 Nov' => ','.$path.$wrapper,
+            '9 Nov' => ','.$path,
+        };
+        $checkWrapper = match ($this->shape) {
+            '3 Nov' => 'function t(W,n){return o(W-50,n)}',
+            '6 Nov' => 'function t(W,n){return o(n-50,W)}',
+            '9 Nov' => 'function t(W,n){return o(W,n-50)}',
+        };
+        $signing = 'n.A=W=>{const n={'.$ops.'}'.$afterOps
             .'r['.$sign('time').']=+new Date;'
             .'const e=n['.$sign($call3).'](u(),f.A,'.$sign('auth.user.id').',null),'
-            .'k=d()([n['.$sign($staticKey).'],r['.$sign('time').'],t,e||0]['.$sign('join').']("\\n"));'
-            .'return r['.$sign('sign').']=[n['.$sign($prefixKey).'],k,function(W){'
-            .($this->laterShape ? 'function t(W,n){return o(n-50,W)}' : 'function t(W,n){return o(W-50,n)}')
+            .'k=d()(['.($nov9 ? $sign($r['static_param']) : 'n['.$sign($staticKey).']').',r['.$sign('time').'],t,e||0]['.$sign('join').']("\\n"));'
+            .($nov9 ? $wrapper : '')
+            .'return r['.$sign('sign').']=['.($nov9 ? $sign($r['prefix']) : 'n['.$sign($prefixKey).']').',k,function(W){'.$checkWrapper
             .'return Math['.$check('abs').']('.$expression.')['.$check('toString').'](16)}(k),'
             .'n['.$sign($suffixKey).']]['.$sign('join').'](":"),r}';
 
         // The rotation check: parseInt of two strings, which only line up in the true order.
         $first = $this->add('860000xyz');
         $second = $this->add('4000abc');
-        $rotateStart = $this->laterShape
-            ? 'const t=W();function o(W,n){return i(n- -100,W)}'
-            : 'function o(W,n){return i(n- -100,W)}const t=W();';
+        $rotateStart = match ($this->shape) {
+            '3 Nov' => 'function o(W,n){return i(n- -100,W)}const t=W();',
+            '6 Nov' => 'const t=W();function o(W,n){return i(n- -100,W)}',
+            '9 Nov' => 'function o(W,n){return i(W- -100,n)}const t=W();',
+        };
+        $rotateCall = fn (int $position) => $nov9
+            ? 'o('.($position + self::OFFSET - 100).',"'.$this->strings[$position][1].'")'
+            : 'o("'.$this->strings[$position][1].'",'.($position + self::OFFSET - 100).')';
         $rotate = '!function(W,n){'.$rotateStart.'for(;;)try{const W=void 0;'
-            .'if(parseInt(o("'.$this->strings[$first][1].'",'.($first + self::OFFSET - 100).'))/1+'
-            .'-parseInt(o("'.$this->strings[$second][1].'",'.($second + self::OFFSET - 100).'))/2===n)break;'
+            .'if(parseInt('.$rotateCall($first).')/1+'
+            .'-parseInt('.$rotateCall($second).')/2===n)break;'
             .'t.push(t.shift())}catch(c){t.push(t.shift())}}(k,858000)';
 
         // Shipped rotated right; the loop's push(shift) turns it back $rotation times.
